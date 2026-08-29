@@ -1,0 +1,16 @@
+{
+  "lr": {
+    "accuracy": 79.98,
+    "precision": 81.29,
+    "recall": 85.49,
+    "f1": 83.34,
+    "auc": 86.8
+  },
+  "rf": {
+    "accuracy": 79.01,
+    "precision": 81.47,
+    "recall": 83.04,
+    "f1": 82.25,
+    "auc": 86.11
+  }
+}

@@ -1,0 +1,803 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>StudentAI</title>
+<style>
+/* ── CHATGPT-STYLE TOKENS ─────────────────────────────────── */
+:root {
+  --bg-page:     #f7f7f8;
+  --bg-surface:  #ffffff;
+  --bg-sidebar:  #f9f9f9;
+  --bg-input:    #ffffff;
+  --bg-hover:    rgba(0,0,0,.05);
+  --accent:      #10a37f;
+  --accent-dk:   #0d8f6e;
+  --accent-lt:   #e6f4f1;
+  --accent-glow: rgba(16,163,127,.2);
+  --text-hi:     #0d0d0d;
+  --text-md:     #6b6b6b;
+  --text-lo:     #acacbe;
+  --border:      #e5e5e5;
+  --border-str:  #d1d5db;
+  --ok:          #10a37f;
+  --ok-bg:       #e6f4f1;
+  --ok-bd:       #a7d9cc;
+  --err:         #ef4444;
+  --err-bg:      #fef2f2;
+  --err-bd:      #fecaca;
+  --sidebar-w:   260px;
+  --hdr-h:       56px;
+  --r:           12px;
+  --r-sm:        8px;
+  --shadow:      0 1px 3px rgba(0,0,0,.08);
+  --font:        ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+}
+
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0 }
+html, body { height:100% }
+body {
+  font-family: var(--font);
+  background: var(--bg-page);
+  color: var(--text-hi);
+  font-size: 14px;
+  line-height: 1.5;
+  display: flex;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* ── SIDEBAR ─────────────────────────────────────────────── */
+.sb {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  height: 100%; overflow: hidden;
+  flex-shrink: 0;
+  transition: transform .25s ease;
+}
+.sb-cfg {
+  padding: 16px 14px;
+  flex: 1; overflow-y: auto;
+}
+.sb-cfg-lbl {
+  font-size: 11px; font-weight: 600; color: var(--text-lo);
+  text-transform: uppercase; letter-spacing: .08em;
+  margin-bottom: 10px; display: block;
+}
+.mode-toggle {
+  display: flex; background: var(--bg-surface);
+  border: 1px solid var(--border); border-radius: var(--r-sm); padding: 3px; gap: 3px;
+}
+.mode-btn {
+  flex: 1; padding: 6px 8px; border: none; background: transparent;
+  border-radius: 6px; font-size: 12px; font-weight: 600; font-family: var(--font);
+  color: var(--text-md); cursor: pointer; transition: all .15s; text-align: center;
+}
+.mode-btn.on {
+  background: var(--accent); color: #fff;
+  box-shadow: 0 1px 4px rgba(16,163,127,.3);
+}
+.sb-divider { height: 1px; background: var(--border); margin: 14px 0 }
+.sb-stat-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 5px 0; border-bottom: 1px solid rgba(0,0,0,.04);
+}
+.sb-stat-row:last-child { border-bottom: none }
+.sb-stat-key { font-size: 12px; color: var(--text-md) }
+.sb-stat-val { font-size: 12px; font-weight: 600; color: var(--text-hi); font-variant-numeric: tabular-nums; text-align: right }
+
+/* ── MAIN ────────────────────────────────────────────────── */
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0 }
+
+.main-hdr {
+  height: var(--hdr-h); background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 20px; display: flex; align-items: center; justify-content: space-between;
+  flex-shrink: 0;
+}
+.hdr-left { display: flex; align-items: center; gap: 10px }
+.hdr-h1 { font-size: 15px; font-weight: 700; color: var(--text-hi); letter-spacing: -.2px }
+.hdr-r { display: flex; align-items: center; gap: 8px }
+
+.hamburger {
+  display: none; padding: 7px; border: none; background: transparent;
+  cursor: pointer; border-radius: 7px; color: var(--text-md); line-height: 0;
+}
+.hamburger:hover { background: var(--bg-hover) }
+
+/* mobile overlay */
+.sb-backdrop {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.3); z-index: 99;
+}
+
+/* ── PANELS ──────────────────────────────────────────────── */
+.panels {
+  flex: 1; display: flex; gap: 12px;
+  padding: 14px; overflow: hidden;
+}
+.panel {
+  background: var(--bg-surface); border: 1px solid var(--border);
+  border-radius: var(--r); display: flex; flex-direction: column;
+  overflow: hidden; box-shadow: var(--shadow);
+}
+.panel-l { flex: 1 }
+.panel-r { width: 360px; min-width: 360px; flex-shrink: 0 }
+
+.panel-hdr {
+  padding: 11px 16px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+}
+.panel-title {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 13px; font-weight: 600; color: var(--text-hi);
+}
+.panel-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border-str); transition: background .2s }
+.panel-dot.live { background: var(--accent) }
+.panel-acts { display: flex; gap: 5px }
+.panel-btn {
+  padding: 4px 10px; border: 1px solid var(--border);
+  border-radius: 6px; background: var(--bg-surface);
+  font-size: 12px; font-weight: 500; font-family: var(--font); color: var(--text-md);
+  cursor: pointer; transition: all .12s;
+}
+.panel-btn:hover { background: var(--bg-hover); border-color: var(--border-str) }
+.panel-body { flex: 1; overflow-y: auto; padding: 16px }
+.panel-foot {
+  padding: 8px 16px; border-top: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+}
+.pf-txt { font-size: 12px; color: var(--text-md) }
+.pf-err { font-size: 12px; color: var(--err); font-weight: 600 }
+
+/* ── FORM ────────────────────────────────────────────────── */
+.fgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px }
+.fg { display: flex; flex-direction: column; gap: 5px }
+.fg.w { grid-column: 1 / -1 }
+.fg-lbl {
+  font-size: 12px; font-weight: 600; color: var(--text-hi);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.fg-val { font-size: 12px; font-weight: 700; color: var(--accent) }
+
+.f-in, .f-sel {
+  padding: 8px 11px; border: 1px solid var(--border);
+  border-radius: var(--r-sm); background: var(--bg-input);
+  font-size: 13px; font-family: var(--font); color: var(--text-hi);
+  outline: none; width: 100%;
+  transition: border-color .15s, box-shadow .15s;
+}
+.f-in:focus, .f-sel:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+.f-sel {
+  appearance: none; cursor: pointer; padding-right: 28px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%236b6b6b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center;
+}
+.range-wrap { display: flex; flex-direction: column; gap: 4px }
+input[type=range] {
+  -webkit-appearance: none; width: 100%; height: 4px;
+  border-radius: 2px; background: var(--border); outline: none; cursor: pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--accent); cursor: pointer;
+  box-shadow: 0 0 0 3px var(--accent-glow); transition: transform .1s;
+}
+input[type=range]::-webkit-slider-thumb:active { transform: scale(1.2) }
+.range-ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-lo) }
+
+/* ── ACTION BUTTONS ──────────────────────────────────────── */
+.input-actions {
+  display: flex; gap: 8px; padding: 12px 16px;
+  border-top: 1px solid var(--border); flex-shrink: 0;
+}
+.reset-btn {
+  padding: 9px 18px; border: 1px solid var(--border-str);
+  border-radius: var(--r-sm); background: var(--bg-surface);
+  font-size: 13px; font-weight: 600; font-family: var(--font); color: var(--text-md);
+  cursor: pointer; transition: all .15s; flex-shrink: 0;
+}
+.reset-btn:hover { background: var(--bg-hover) }
+.analyze-btn {
+  flex: 1; padding: 9px 16px; border: none;
+  border-radius: var(--r-sm); background: var(--accent);
+  color: #fff; font-size: 13px; font-weight: 700; font-family: var(--font);
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(16,163,127,.3);
+  transition: background .15s, box-shadow .15s;
+}
+.analyze-btn:hover:not(:disabled) { background: var(--accent-dk); box-shadow: 0 2px 8px rgba(16,163,127,.4) }
+.analyze-btn:disabled { opacity: .5; cursor: not-allowed }
+
+/* ── OUTPUT ──────────────────────────────────────────────── */
+.out-ph, .out-load, .out-res { height: 100% }
+
+.out-ph {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; text-align: center;
+}
+.out-ph svg { opacity: .2 }
+.out-ph p { font-size: 13px; max-width: 190px; line-height: 1.65; color: var(--text-md) }
+
+.out-load {
+  display: none; flex-direction: column;
+  align-items: center; justify-content: center; gap: 12px;
+}
+.spinner {
+  width: 32px; height: 32px; border: 3px solid var(--border);
+  border-top-color: var(--accent); border-radius: 50%;
+  animation: spin .75s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg) } }
+.out-load p { font-size: 13px; color: var(--text-md) }
+
+.out-res { display: none; flex-direction: column; align-items: center; gap: 10px; padding-top: 4px }
+
+.risk-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 12px; border-radius: 20px;
+  font-size: 12px; font-weight: 700;
+}
+.risk-badge.hi { background: var(--err-bg); color: var(--err); border: 1px solid var(--err-bd) }
+.risk-badge.lo { background: var(--ok-bg);  color: var(--ok);  border: 1px solid var(--ok-bd) }
+
+.res-hl { font-size: 19px; font-weight: 800; letter-spacing: -.4px; line-height: 1; text-align: center }
+.res-hl.d  { color: var(--err) }
+.res-hl.ok { color: var(--ok) }
+
+.score-ring-wrap {
+  position: relative; width: 120px; height: 120px;
+  display: flex; align-items: center; justify-content: center;
+}
+.score-ring { width: 120px; height: 120px }
+.ring-bg { stroke: var(--border) }
+.ring-fg { transition: stroke-dashoffset 1s cubic-bezier(.4,0,.2,1), stroke .3s }
+.score-ring-inner { position: absolute; display: flex; align-items: baseline; gap: 1px }
+.score-num { font-size: 28px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1 }
+.score-pct { font-size: 13px; font-weight: 600; color: var(--text-lo) }
+.conf-model { font-size: 12px; color: var(--text-lo) }
+
+.mini-bars { width: 100%; margin-top: 2px }
+.bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px }
+.bar-row:last-child { margin-bottom: 0 }
+.bar-lbl { font-size: 12px; color: var(--text-md); width: 88px; flex-shrink: 0 }
+.bar-track { flex: 1; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden }
+.bar-fill { height: 100%; border-radius: 3px; transition: width .9s cubic-bezier(.4,0,.2,1) }
+.bar-fill.d  { background: var(--err) }
+.bar-fill.ok { background: var(--ok) }
+.bar-pct { font-size: 12px; font-weight: 700; color: var(--text-md); width: 36px; text-align: right; flex-shrink: 0; font-variant-numeric: tabular-nums }
+
+.recs { width: 100%; border-top: 1px solid var(--border); padding-top: 12px; margin-top: 2px }
+.recs-title { font-size: 12px; font-weight: 700; color: var(--text-hi); margin-bottom: 8px }
+.rec-row {
+  display: flex; align-items: flex-start; gap: 7px;
+  padding: 4px 0; border-bottom: 1px solid var(--bg-page);
+  font-size: 12px; color: var(--text-md); line-height: 1.5;
+}
+.rec-row:last-child { border-bottom: none }
+.rec-pip { width: 5px; height: 5px; border-radius: 50%; margin-top: 5px; flex-shrink: 0 }
+.rec-pip.d  { background: var(--err) }
+.rec-pip.ok { background: var(--ok) }
+
+::-webkit-scrollbar { width: 5px }
+::-webkit-scrollbar-track { background: transparent }
+::-webkit-scrollbar-thumb { background: var(--border-str); border-radius: 3px }
+
+/* ── MOBILE ──────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  body { overflow: hidden; height: 100dvh }
+
+  .sb {
+    position: fixed; top: 0; left: 0; bottom: 0; height: 100%;
+    z-index: 100; transform: translateX(-100%);
+    box-shadow: 4px 0 24px rgba(0,0,0,.15);
+  }
+  .sb.open { transform: translateX(0) }
+  .sb-backdrop.show { display: block }
+
+  .hamburger { display: flex; align-items: center; justify-content: center }
+
+  .panels {
+    flex-direction: column;
+    overflow-y: auto; overflow-x: hidden;
+    padding: 10px;
+    gap: 10px;
+  }
+
+  .panel-l { min-height: 520px }
+  .panel-r { width: 100%; min-width: 0; min-height: 400px }
+
+  .fgrid { grid-template-columns: 1fr }
+  .fg.w  { grid-column: 1 }
+}
+
+@media (max-width: 480px) {
+  .panels { padding: 8px; gap: 8px }
+  .panel-body { padding: 12px }
+  .input-actions { padding: 10px 12px; gap: 6px }
+  .main-hdr { padding: 0 12px }
+  .hdr-h1 { font-size: 14px }
+  .panel-l { min-height: 480px }
+}
+</style>
+</head>
+<body>
+
+<!-- mobile backdrop -->
+<div class="sb-backdrop" id="sb-backdrop" onclick="closeSidebar()"></div>
+
+<!-- ── SIDEBAR ──────────────────────────────────────────── -->
+<aside class="sb" id="sb">
+  <div class="sb-cfg">
+    <span class="sb-cfg-lbl">Model Settings</span>
+
+    <div style="margin-bottom:14px">
+      <div class="mode-toggle">
+        <button class="mode-btn on" id="btn-lr" onclick="setModel('lr')">LR</button>
+        <button class="mode-btn"    id="btn-rf" onclick="setModel('rf')">RF</button>
+      </div>
+    </div>
+
+    <div class="sb-divider"></div>
+    <span class="sb-cfg-lbl">Model Performance</span>
+
+    <div class="sb-stat-row">
+      <span class="sb-stat-key">Active Model</span>
+      <span class="sb-stat-val" id="sb-model">Logistic Regression</span>
+    </div>
+    <div class="sb-stat-row">
+      <span class="sb-stat-key">Accuracy</span>
+      <span class="sb-stat-val" id="sb-acc">79.98%</span>
+    </div>
+    <div class="sb-stat-row">
+      <span class="sb-stat-key">Precision</span>
+      <span class="sb-stat-val" id="sb-prec">81.29%</span>
+    </div>
+    <div class="sb-stat-row">
+      <span class="sb-stat-key">Recall</span>
+      <span class="sb-stat-val" id="sb-rec">85.49%</span>
+    </div>
+    <div class="sb-stat-row">
+      <span class="sb-stat-key">F1-Score</span>
+      <span class="sb-stat-val" id="sb-f1">83.34%</span>
+    </div>
+
+    <div class="sb-divider"></div>
+    <span class="sb-cfg-lbl">Dataset</span>
+
+    <div class="sb-stat-row">
+      <span class="sb-stat-key">Source</span>
+      <span class="sb-stat-val">Kaggle</span>
+    </div>
+    <div class="sb-stat-row">
+      <span class="sb-stat-key">Total Records</span>
+      <span class="sb-stat-val">27,895</span>
+    </div>
+    <div class="sb-stat-row">
+      <span class="sb-stat-key">Training Set</span>
+      <span class="sb-stat-val">22,316 (80%)</span>
+    </div>
+    <div class="sb-stat-row">
+      <span class="sb-stat-key">Test Set</span>
+      <span class="sb-stat-val">5,579 (20%)</span>
+    </div>
+    <div class="sb-stat-row">
+      <span class="sb-stat-key">Features</span>
+      <span class="sb-stat-val">9</span>
+    </div>
+    <div class="sb-stat-row">
+      <span class="sb-stat-key">Classes</span>
+      <span class="sb-stat-val">2</span>
+    </div>
+  </div>
+</aside>
+
+<!-- ── MAIN ────────────────────────────────────────────── -->
+<div class="main">
+
+  <header class="main-hdr">
+    <div class="hdr-left">
+      <button class="hamburger" onclick="openSidebar()" aria-label="Open settings">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="3" y1="6"  x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+      <div class="hdr-h1">Student Distress Analyzer</div>
+    </div>
+    <div class="hdr-r"></div>
+  </header>
+
+  <div class="panels">
+
+    <!-- LEFT: Input -->
+    <div class="panel panel-l">
+      <div class="panel-hdr">
+        <div class="panel-title">
+          <div class="panel-dot live"></div>
+          Student Profile Input
+        </div>
+        <div class="panel-acts">
+          <button class="panel-btn" onclick="clearAll()">Clear</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="fgrid">
+
+          <div class="fg">
+            <label class="fg-lbl">Gender</label>
+            <select class="f-sel" id="gender" onchange="countF()">
+              <option value="">Select…</option>
+              <option>Male</option>
+              <option>Female</option>
+            </select>
+          </div>
+
+          <div class="fg">
+            <label class="fg-lbl">Age</label>
+            <input class="f-in" type="number" id="age" min="15" max="45" placeholder="e.g. 21" oninput="countF()">
+          </div>
+
+          <div class="fg w">
+            <label class="fg-lbl">Academic Pressure <span class="fg-val" id="ap-v">3</span></label>
+            <div class="range-wrap">
+              <input type="range" id="ap" min="1" max="5" value="3" oninput="syncR('ap','ap-v')">
+              <div class="range-ends"><span>1 · Low</span><span>5 · High</span></div>
+            </div>
+          </div>
+
+          <div class="fg">
+            <label class="fg-lbl">CGPA (0.0–5.0)</label>
+            <input class="f-in" type="number" id="cgpa" min="0" max="5" step="0.01" placeholder="e.g. 3.5" oninput="countF()">
+          </div>
+
+          <div class="fg">
+            <label class="fg-lbl">Study Satisfaction <span class="fg-val" id="ss-v">3</span></label>
+            <div class="range-wrap">
+              <input type="range" id="ss" min="1" max="5" value="3" oninput="syncR('ss','ss-v')">
+              <div class="range-ends"><span>1</span><span>5</span></div>
+            </div>
+          </div>
+
+          <div class="fg">
+            <label class="fg-lbl">Sleep Duration</label>
+            <select class="f-sel" id="sleep" onchange="countF()">
+              <option value="">Select…</option>
+              <option>Less than 5 hours</option>
+              <option>5-6 hours</option>
+              <option>7-8 hours</option>
+              <option>More than 8 hours</option>
+              <option>Others</option>
+            </select>
+          </div>
+
+          <div class="fg">
+            <label class="fg-lbl">Dietary Habits</label>
+            <select class="f-sel" id="diet" onchange="countF()">
+              <option value="">Select…</option>
+              <option>Healthy</option>
+              <option>Moderate</option>
+              <option>Unhealthy</option>
+              <option>Others</option>
+            </select>
+          </div>
+
+          <div class="fg w">
+            <label class="fg-lbl">Work / Study Hours per Day <span class="fg-val" id="wsh-v">6</span>h</label>
+            <div class="range-wrap">
+              <input type="range" id="wsh" min="0" max="16" value="6" oninput="syncR('wsh','wsh-v')">
+              <div class="range-ends"><span>0h</span><span>16h</span></div>
+            </div>
+          </div>
+
+          <div class="fg w">
+            <label class="fg-lbl">Financial Stress <span class="fg-val" id="fs-v">3</span></label>
+            <div class="range-wrap">
+              <input type="range" id="fs" min="1" max="5" value="3" oninput="syncR('fs','fs-v')">
+              <div class="range-ends"><span>1 · Low</span><span>5 · High</span></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+      <div class="panel-foot">
+        <span class="pf-txt" id="f-count">0 / 9 fields completed</span>
+        <span class="pf-err" id="v-err"></span>
+      </div>
+      <div class="input-actions">
+        <button class="reset-btn" onclick="resetOut();clearAll()">Reset</button>
+        <button class="analyze-btn" id="analyze-btn" onclick="runAnalysis()">Analyze · LR →</button>
+      </div>
+    </div>
+
+    <!-- RIGHT: Output -->
+    <div class="panel panel-r">
+      <div class="panel-hdr">
+        <div class="panel-title">
+          <div class="panel-dot" id="out-dot"></div>
+          Prediction Result
+        </div>
+        <div class="panel-acts">
+          <button class="panel-btn" onclick="copyResult()">Copy</button>
+        </div>
+      </div>
+      <div class="panel-body" id="out-body">
+
+        <div class="out-ph" id="out-ph">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" width="40" height="40">
+            <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+          </svg>
+          <p>Run an analysis to see the distress prediction score</p>
+        </div>
+
+        <div class="out-load" id="out-load">
+          <div class="spinner"></div>
+          <p>Analyzing…</p>
+        </div>
+
+        <div class="out-res" id="out-res">
+
+          <div class="score-ring-wrap">
+            <svg class="score-ring" viewBox="0 0 100 100">
+              <circle class="ring-bg" cx="50" cy="50" r="40" fill="none" stroke-width="7"/>
+              <circle class="ring-fg" id="ring-fg" cx="50" cy="50" r="40" fill="none" stroke-width="7"
+                stroke-dasharray="251.2" stroke-dashoffset="251.2"
+                stroke-linecap="round" transform="rotate(-90 50 50)"/>
+            </svg>
+            <div class="score-ring-inner">
+              <span class="score-num" id="score-num">—</span>
+              <span class="score-pct">%</span>
+            </div>
+          </div>
+
+          <span class="risk-badge" id="res-badge" style="margin:0 auto 2px"></span>
+          <div class="res-hl" id="res-hl"></div>
+          <div class="conf-model" id="conf-model" style="text-align:center;margin-top:2px"></div>
+
+          <div class="mini-bars">
+            <div class="bar-row">
+              <span class="bar-lbl">Distressed</span>
+              <div class="bar-track"><div class="bar-fill d" id="bar-d" style="width:0%"></div></div>
+              <span class="bar-pct" id="pct-d">—</span>
+            </div>
+            <div class="bar-row">
+              <span class="bar-lbl">Not Distressed</span>
+              <div class="bar-track"><div class="bar-fill ok" id="bar-nd" style="width:0%"></div></div>
+              <span class="bar-pct" id="pct-nd">—</span>
+            </div>
+          </div>
+
+          <div class="recs" id="recs">
+            <div class="recs-title" id="recs-title"></div>
+            <div id="recs-list"></div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── STATE ───────────────────────────────────────────────────
+let mdl = 'lr';
+let lastPayload = null;
+const METRICS = {
+  lr: {name:'Logistic Regression', acc:'79.98%', prec:'81.29%', rec:'85.49%', f1:'83.34%'},
+  rf: {name:'Random Forest',       acc:'79.01%', prec:'81.47%', rec:'83.04%', f1:'82.25%'}
+};
+
+// ── SIDEBAR MOBILE TOGGLE ───────────────────────────────────
+function openSidebar(){
+  document.getElementById('sb').classList.add('open');
+  document.getElementById('sb-backdrop').classList.add('show');
+}
+function closeSidebar(){
+  document.getElementById('sb').classList.remove('open');
+  document.getElementById('sb-backdrop').classList.remove('show');
+}
+
+// ── MODEL ───────────────────────────────────────────────────
+function setModel(m){
+  mdl = m;
+  document.getElementById('btn-lr').classList.toggle('on', m === 'lr');
+  document.getElementById('btn-rf').classList.toggle('on', m === 'rf');
+  const mt = METRICS[m];
+  document.getElementById('sb-model').textContent = mt.name;
+  document.getElementById('sb-acc').textContent   = mt.acc;
+  document.getElementById('sb-prec').textContent  = mt.prec;
+  document.getElementById('sb-rec').textContent   = mt.rec;
+  document.getElementById('sb-f1').textContent    = mt.f1;
+  document.getElementById('analyze-btn').textContent = 'Analyze · ' + (m === 'lr' ? 'LR' : 'RF') + ' →';
+  closeSidebar();
+}
+
+// ── RANGE ───────────────────────────────────────────────────
+function syncR(id, vid){
+  document.getElementById(vid).textContent = document.getElementById(id).value;
+  countF();
+}
+
+// ── FIELD COUNT ─────────────────────────────────────────────
+function countF(){
+  const picks = ['gender','age','cgpa','sleep','diet'];
+  const n = picks.filter(id => document.getElementById(id).value.trim() !== '').length + 4;
+  document.getElementById('f-count').textContent = Math.min(n, 9) + ' / 9 fields completed';
+}
+
+// ── CLEAR ───────────────────────────────────────────────────
+function clearAll(){
+  ['gender','age','cgpa','sleep','diet'].forEach(id => document.getElementById(id).value = '');
+  Object.entries({ap:3, ss:3, wsh:6, fs:3}).forEach(([id, v]) => {
+    document.getElementById(id).value = v; syncR(id, id + '-v');
+  });
+  countF(); resetOut();
+  document.getElementById('v-err').textContent = '';
+}
+
+// ── VALIDATE ────────────────────────────────────────────────
+function validate(){
+  const g  = document.getElementById('gender').value;
+  const a  = +document.getElementById('age').value;
+  const c  = +document.getElementById('cgpa').value;
+  const sl = document.getElementById('sleep').value;
+  const d  = document.getElementById('diet').value;
+  if (!g)                      return 'Select a gender';
+  if (!a || a < 15 || a > 45) return 'Age must be 15–45';
+  if ((!c && c !== 0) || c < 0 || c > 5) return 'CGPA must be 0.0–5.0';
+  if (!sl)                     return 'Select sleep duration';
+  if (!d)                      return 'Select dietary habits';
+  return null;
+}
+
+// ── RUN ─────────────────────────────────────────────────────
+async function runAnalysis(){
+  const err = validate();
+  if (err){
+    document.getElementById('v-err').textContent = err;
+    setTimeout(() => document.getElementById('v-err').textContent = '', 3000);
+    return;
+  }
+  document.getElementById('v-err').textContent = '';
+  setState('load');
+
+  const payload = {
+    model:              mdl,
+    gender:             document.getElementById('gender').value,
+    age:                document.getElementById('age').value,
+    academic_pressure:  document.getElementById('ap').value,
+    cgpa:               document.getElementById('cgpa').value,
+    study_satisfaction: document.getElementById('ss').value,
+    sleep_duration:     document.getElementById('sleep').value,
+    dietary_habits:     document.getElementById('diet').value,
+    work_study_hours:   document.getElementById('wsh').value,
+    financial_stress:   document.getElementById('fs').value
+  };
+  lastPayload = payload;
+
+  try {
+    const r = await fetch('/predict', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    if (!r.ok) throw 0;
+    renderResult(await r.json());
+  } catch {
+    renderResult(simulate(payload));
+  }
+}
+
+// ── SIMULATE ────────────────────────────────────────────────
+function simulate(p){
+  let s = 0;
+  if (+p.academic_pressure >= 4)              s += 2;
+  if (+p.financial_stress  >= 4)              s += 2;
+  if (+p.study_satisfaction <= 2)             s += 1.5;
+  if (p.sleep_duration === 'Less than 5 hours') s += 1.5;
+  if (p.dietary_habits === 'Unhealthy')       s += 1;
+  if (+p.work_study_hours >= 10)              s += 1;
+  if (+p.cgpa < 2.5)                          s += 1;
+  const label = s >= 4 ? 1 : 0;
+  const pd = Math.min(.95, Math.max(.15, s/10 + .3 + (Math.random()-.5)*.08));
+  const conf = label === 1 ? pd : 1 - pd;
+  return {
+    label, label_text: label === 1 ? 'Distressed' : 'Not Distressed',
+    confidence:         +(conf*100).toFixed(2),
+    prob_distressed:    +(pd*100).toFixed(2),
+    prob_not_distressed:+((1-pd)*100).toFixed(2),
+    model: METRICS[mdl].name + ' (demo)'
+  };
+}
+
+// ── RENDER ──────────────────────────────────────────────────
+function renderResult(data){
+  setState('result');
+  const isD = data.label === 1;
+  const cls  = isD ? 'd' : 'ok';
+
+  const badge = document.getElementById('res-badge');
+  badge.className = 'risk-badge ' + (isD ? 'hi' : 'lo');
+  badge.textContent = isD ? '⚠ High Risk' : '✓ Low Risk';
+
+  const hl = document.getElementById('res-hl');
+  hl.className = 'res-hl ' + cls;
+  hl.textContent = data.label_text;
+
+  const ringEl = document.getElementById('ring-fg');
+  const offset = 251.2 - (data.confidence / 100) * 251.2;
+  ringEl.style.stroke = isD ? 'var(--err)' : 'var(--ok)';
+  requestAnimationFrame(() => { ringEl.style.strokeDashoffset = offset; });
+  const numEl = document.getElementById('score-num');
+  numEl.style.color = isD ? 'var(--err)' : 'var(--ok)';
+  numEl.textContent = Math.round(data.confidence);
+  document.getElementById('conf-model').textContent = 'via ' + data.model;
+
+  requestAnimationFrame(() => {
+    document.getElementById('bar-d').style.width  = data.prob_distressed + '%';
+    document.getElementById('bar-nd').style.width = data.prob_not_distressed + '%';
+  });
+  document.getElementById('pct-d').textContent  = data.prob_distressed.toFixed(1) + '%';
+  document.getElementById('pct-nd').textContent = data.prob_not_distressed.toFixed(1) + '%';
+  document.getElementById('out-dot').classList.add('live');
+
+  document.getElementById('recs').style.display = 'block';
+  document.getElementById('recs-title').textContent = isD ? 'Intervention Recommendations' : 'Wellness Tips';
+  const list = isD ? [
+    'Seek counseling or a mental health professional as soon as possible',
+    'Speak to your academic advisor about reducing workload this semester',
+    'Prioritise 7–8 hours of sleep — recovery depends on it',
+    'Explore campus financial aid, bursaries, or scholarship programs',
+    'Practice daily mindfulness, journaling, or structured breathing exercises',
+    'Connect with peer support groups, family, or student counselling services'
+  ] : [
+    'Your current routines appear balanced — maintain them consistently',
+    'Continue healthy sleep habits for sustained academic performance',
+    'Check in with your academic advisor each semester proactively',
+    'Monitor stress levels and seek support early before issues escalate',
+    'Consider supporting classmates who may be struggling'
+  ];
+  document.getElementById('recs-list').innerHTML = list.map(r =>
+    `<div class="rec-row"><div class="rec-pip ${cls}"></div><span>${r}</span></div>`
+  ).join('');
+}
+
+// ── HELPERS ─────────────────────────────────────────────────
+function setState(s){
+  document.getElementById('out-ph').style.display   = s === 'ph'     ? 'flex' : 'none';
+  document.getElementById('out-load').style.display = s === 'load'   ? 'flex' : 'none';
+  document.getElementById('out-res').style.display  = s === 'result' ? 'flex' : 'none';
+  document.getElementById('analyze-btn').disabled   = s === 'load';
+}
+
+function resetOut(){
+  setState('ph');
+  document.getElementById('out-dot').classList.remove('live');
+  document.getElementById('bar-d').style.width  = '0%';
+  document.getElementById('bar-nd').style.width = '0%';
+}
+
+function copyResult(){
+  const hl = document.getElementById('res-hl').textContent;
+  if (!hl) return;
+  navigator.clipboard.writeText(
+    `Student Distress Analysis\nResult: ${hl}\n` +
+    `P(Distressed): ${document.getElementById('pct-d').textContent}\n` +
+    `P(Not Distressed): ${document.getElementById('pct-nd').textContent}`
+  ).catch(() => {});
+}
+
+// ── INIT ────────────────────────────────────────────────────
+setState('ph');
+countF();
+</script>
+</body>
+</html>
