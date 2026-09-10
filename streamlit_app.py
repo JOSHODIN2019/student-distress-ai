@@ -398,6 +398,68 @@ div[data-baseweb="select"] > div:focus-within {
   0%,100% { opacity:1; }
   50%      { opacity:.6; }
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   MOBILE  (≤ 768 px)
+   ════════════════════════════════════════════════════════════════════════════ */
+@media (max-width:768px) {
+
+/* Re-enable scroll */
+html, body { overflow:auto !important; height:auto !important; }
+[data-testid="stAppViewContainer"],
+[data-testid="stMain"] { height:auto !important; overflow:auto !important; }
+
+/* Solid gray bg — no white sidebar stripe */
+[data-testid="stAppViewContainer"] { background:#edf0f5 !important; }
+
+/* Header row: hide blank flanking columns, title fills width */
+[data-testid="stHorizontalBlock"]:has([data-role="form-header"])
+  > [data-testid="stColumn"]:first-child,
+[data-role="form-header-result"] { display:none !important; }
+[data-role="form-header"] {
+    flex:1 1 100% !important; max-width:100% !important;
+    padding:16px 16px 10px !important;
+}
+
+/* Main layout: stack columns vertically */
+[data-role="main-layout"] {
+    flex-direction:column !important;
+    height:auto !important; min-height:auto !important;
+}
+
+/* Hide sidebar on mobile */
+[data-role="sidebar"] { display:none !important; }
+
+/* Form and result: full width, natural height */
+[data-role="form"],
+[data-role="result"] {
+    flex:1 1 100% !important;
+    width:100% !important; max-width:100% !important;
+    height:auto !important; min-height:auto !important; max-height:none !important;
+    margin-top:0 !important;
+}
+[data-role="form"]   { padding:12px 12px 16px !important; }
+[data-role="result"] { padding:0 12px 16px !important; }
+
+/* Result card: lift max-height cap on mobile */
+[data-role="result"] > div:first-child,
+[data-role="result"] > div:first-child:has(.result-card) {
+    max-height:none !important; overflow-y:visible !important;
+}
+
+/* Form field rows: tighter horizontal padding */
+[data-role="form"] [data-testid="stHorizontalBlock"] {
+    padding:0 12px !important; gap:8px !important;
+}
+}
+
+/* Very small screens (≤ 480 px): stack 2-col field pairs vertically */
+@media (max-width:480px) {
+[data-role="form"] [data-testid="stHorizontalBlock"] { flex-wrap:wrap !important; }
+[data-role="form"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+    flex:1 1 100% !important; min-width:0 !important; width:100% !important;
+}
+}
 </style>""", unsafe_allow_html=True)
 
 # ── JS: tag 3-column layout for CSS targeting ─────────────────────────────────
@@ -454,12 +516,18 @@ function cleanSliders() {
     } catch(e) {}
 }
 
+function isMobile() {
+    try { return parent.innerWidth <= 768; } catch(e) { return false; }
+}
+
 function alignSidebar() {
     try {
         var doc = parent.document;
-        var headerCol = doc.querySelector('[data-role="form-header"]');
         var sidebar = doc.querySelector('[data-role="sidebar"]');
-        if (!headerCol || !sidebar) return;
+        if (!sidebar) return;
+        if (isMobile()) { sidebar.style.marginTop = '0'; return; }
+        var headerCol = doc.querySelector('[data-role="form-header"]');
+        if (!headerCol) return;
         var row = headerCol.closest('[data-testid="stHorizontalBlock"]');
         if (!row) return;
         sidebar.style.marginTop = '-' + row.offsetHeight + 'px';
@@ -469,6 +537,11 @@ function alignSidebar() {
 function setLayoutHeight() {
     try {
         var doc = parent.document;
+        var el = doc.getElementById('sda-layout-h');
+        if (isMobile()) {
+            if (el) el.textContent = '';
+            return;
+        }
         var hrowEl = doc.querySelector('[data-role="form-header"]');
         if (!hrowEl) return;
         var hrow = hrowEl.closest('[data-testid="stHorizontalBlock"]');
@@ -476,7 +549,6 @@ function setLayoutHeight() {
         var headerH = hrow.offsetHeight;
         var vh = Math.min(parent.innerHeight, doc.documentElement.clientHeight);
         var mainH = Math.max(vh - headerH - 4, 380);
-        var el = doc.getElementById('sda-layout-h');
         if (!el) { el = doc.createElement('style'); el.id = 'sda-layout-h'; doc.head.appendChild(el); }
         el.textContent =
             '[data-role="main-layout"]{height:'+mainH+'px!important;min-height:'+mainH+'px!important;}' +
