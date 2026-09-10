@@ -1,372 +1,956 @@
 import streamlit as st
-import joblib, os, pandas as pd
-from datetime import datetime
+import streamlit.components.v1 as components
+import joblib, os, json, pandas as pd
 
 st.set_page_config(
-    page_title="StudentAI — Distress Predictor",
-    page_icon="🧠",
+    page_title="Student Distress Analyzer",
+    page_icon=":material/neurology:",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
-# ── ChatGPT-style CSS ─────────────────────────────────────────────────────────
-st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
-html, body, [class*="css"] {
-    font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-}
-#MainMenu, footer, header { visibility: hidden; }
-.block-container { padding: 1.25rem 1.5rem 2rem; max-width: 100%; }
-
-/* Sidebar */
-[data-testid="stSidebar"] {
-    background: #f9f9f9;
-    border-right: 1px solid #e5e5e5;
-}
-[data-testid="stSidebar"] > div:first-child { padding-top: 1rem; }
-[data-testid="stSidebar"] .stRadio > div { gap: 6px; }
-[data-testid="stSidebar"] .stRadio label {
-    font-size: 13px; font-weight: 500; color: #0d0d0d;
-}
-
-/* Metrics */
-[data-testid="metric-container"] {
-    background: #ffffff;
-    border: 1px solid #e5e5e5;
-    border-radius: 10px;
-    padding: 10px 12px 8px;
-}
-[data-testid="metric-container"] [data-testid="stMetricLabel"] {
-    font-size: 11px; color: #6b6b6b; font-weight: 500;
-}
-[data-testid="metric-container"] [data-testid="stMetricValue"] {
-    font-size: 1rem; font-weight: 700; color: #0d0d0d;
-}
-
-/* Buttons */
-.stButton > button {
-    border-radius: 8px;
-    font-weight: 600;
-    font-size: 13px;
-    height: 40px;
-    font-family: 'Inter', sans-serif;
-    transition: all .15s;
-}
-.stButton > button[kind="primary"] {
-    background: #10a37f;
-    border-color: #10a37f;
-    color: white;
-}
-.stButton > button[kind="primary"]:hover {
-    background: #0d8f6e;
-    border-color: #0d8f6e;
-}
-.stButton > button[kind="secondary"] {
-    border-color: #d1d5db;
-    color: #374151;
-    background: white;
-}
-.stButton > button[kind="secondary"]:hover { background: #f7f7f8; }
-
-/* Form labels */
-[data-testid="stSelectbox"] label,
-[data-testid="stNumberInput"] label,
-[data-testid="stSlider"] label {
-    font-size: 12px; font-weight: 600; color: #0d0d0d;
-}
-
-/* Inputs & selects */
-div[data-baseweb="select"] > div {
-    border-color: #e5e5e5 !important;
-    border-radius: 8px !important;
-    background: white !important;
-    font-size: 13px !important;
-}
-div[data-baseweb="select"] > div:focus-within {
-    border-color: #10a37f !important;
-    box-shadow: 0 0 0 3px rgba(16,163,127,.2) !important;
-}
-input[type="number"] {
-    border-radius: 8px !important;
-    border-color: #e5e5e5 !important;
-    font-size: 13px !important;
-}
-input[type="number"]:focus {
-    border-color: #10a37f !important;
-    box-shadow: 0 0 0 3px rgba(16,163,127,.2) !important;
-}
-
-/* Slider accent */
-[data-testid="stSlider"] [data-testid="stSlider"] div[role="slider"] { background: #10a37f; }
-
-/* Panel boxes */
-.panel-box {
-    background: white;
-    border: 1px solid #e5e5e5;
-    border-radius: 12px;
-    padding: 18px 20px;
-    margin-bottom: 0;
-    box-shadow: 0 1px 3px rgba(0,0,0,.06);
-}
-.panel-title {
-    font-size: 11px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: .07em; color: #acacbe; margin-bottom: 14px;
-}
-.dot-live {
-    display: inline-block; width: 7px; height: 7px; border-radius: 50%;
-    background: #10a37f; margin-right: 6px; vertical-align: middle;
-}
-
-/* Score ring result */
-.score-wrap { text-align: center; padding: 12px 0 8px; }
-.badge-hi {
-    display: inline-block;
-    background: #fef2f2; color: #ef4444; border: 1px solid #fecaca;
-    border-radius: 20px; padding: 4px 14px; font-size: 12px; font-weight: 700;
-}
-.badge-lo {
-    display: inline-block;
-    background: #e6f4f1; color: #10a37f; border: 1px solid #a7d9cc;
-    border-radius: 20px; padding: 4px 14px; font-size: 12px; font-weight: 700;
-}
-.bar-track { background: #e5e5e5; border-radius: 4px; height: 6px; overflow: hidden; margin-top: 3px; }
-.bar-fill-d  { background: #ef4444; border-radius: 4px; height: 6px; }
-.bar-fill-ok { background: #10a37f; border-radius: 4px; height: 6px; }
-.rec-row {
-    display: flex; align-items: flex-start; gap: 8px;
-    padding: 5px 0; border-bottom: 1px solid #f7f7f8;
-    font-size: 12px; color: #6b6b6b; line-height: 1.5;
-}
-.rec-row:last-child { border-bottom: none; }
-.rec-pip-d  { width: 5px; height: 5px; border-radius: 50%; background: #ef4444; margin-top: 5px; flex-shrink: 0; }
-.rec-pip-ok { width: 5px; height: 5px; border-radius: 50%; background: #10a37f; margin-top: 5px; flex-shrink: 0; }
-.sb-row {
-    display: flex; justify-content: space-between;
-    font-size: 12px; padding: 4px 0; border-bottom: 1px solid rgba(0,0,0,.04);
-}
-.sb-row:last-child { border-bottom: none; }
-.sb-key { color: #6b6b6b; }
-.sb-val { font-weight: 600; color: #0d0d0d; text-align: right; }
-</style>
-""", unsafe_allow_html=True)
-
-# ── Load models ───────────────────────────────────────────────────────────────
 BASE = os.path.dirname(os.path.abspath(__file__))
 
-@st.cache_resource(show_spinner="Loading models…")
-def load_models():
-    lr  = joblib.load(os.path.join(BASE, "logistic_regression_model.pkl"))
-    rf  = joblib.load(os.path.join(BASE, "random_forest_model.pkl"))
-    sc  = joblib.load(os.path.join(BASE, "scaler.pkl"))
-    enc = joblib.load(os.path.join(BASE, "label_encoders.pkl"))
-    return lr, rf, sc, enc
+# ── Model registry ─────────────────────────────────────────────────────────────
+MODEL_CONFIG = [
+    {"id": "lr", "name": "Logistic Reg", "short": "LR", "file": "logistic_regression_model.pkl"},
+    {"id": "rf", "name": "Random Forest",           "short": "RF", "file": "random_forest_model.pkl"},
+]
+for m in MODEL_CONFIG:
+    m["available"] = os.path.exists(os.path.join(BASE, m["file"]))
 
-lr_model, rf_model, scaler, encoders = load_models()
+try:
+    with open(os.path.join(BASE, "model_metrics.json")) as f:
+        METRICS = json.load(f)
+except Exception:
+    METRICS = {}
 
 CATEGORICAL = ["Gender", "Sleep Duration", "Dietary Habits"]
-NUMERICAL   = ["Age", "Academic Pressure", "CGPA", "Study Satisfaction", "Work/Study Hours", "Financial Stress"]
+NUMERICAL   = ["Age", "Academic Pressure", "CGPA", "Study Satisfaction",
+               "Work/Study Hours", "Financial Stress"]
 FEATURES    = ["Gender", "Age", "Academic Pressure", "CGPA", "Study Satisfaction",
                "Sleep Duration", "Dietary Habits", "Work/Study Hours", "Financial Stress"]
 
-METRICS = {
-    "lr": dict(name="Logistic Regression", acc="79.98%", prec="81.29%", rec="85.49%", f1="83.34%"),
-    "rf": dict(name="Random Forest",       acc="79.01%", prec="81.47%", rec="83.04%", f1="82.25%"),
+@st.cache_resource(show_spinner="Initialising models…")
+def load_resources():
+    models = {}
+    for m in MODEL_CONFIG:
+        if m["available"]:
+            models[m["id"]] = joblib.load(os.path.join(BASE, m["file"]))
+    return (
+        models,
+        joblib.load(os.path.join(BASE, "scaler.pkl")),
+        joblib.load(os.path.join(BASE, "label_encoders.pkl")),
+    )
+
+loaded_models, scaler, encoders = load_resources()
+
+# ── Session state ──────────────────────────────────────────────────────────────
+available_ids = [m["id"] for m in MODEL_CONFIG if m["available"]]
+def _init(k, v):
+    if k not in st.session_state: st.session_state[k] = v
+
+_init("mdl",    available_ids[0] if available_ids else "lr")
+_init("result", None)
+_init("ap", 3); _init("ss", 3); _init("wsh", 6); _init("fs", 3)
+
+mdl        = st.session_state.mdl
+active_cfg = next((m for m in MODEL_CONFIG if m["id"] == mdl), MODEL_CONFIG[0])
+met        = METRICS.get(mdl, {})
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CSS
+# ══════════════════════════════════════════════════════════════════════════════
+st.markdown("""<style>
+/* ─ Chrome removal ──────────────────────────────────────────────────────── */
+#MainMenu, footer, header,
+[data-testid="stToolbar"], [data-testid="stDecoration"],
+section[data-testid="stSidebar"], [data-testid="collapsedControl"],
+[data-testid="stSidebarCollapsedControl"] { display:none !important; }
+
+/* ─ Reset ───────────────────────────────────────────────────────────────── */
+html, body { margin:0; padding:0; overflow:hidden; height:100vh; }
+* { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif !important;
+    box-sizing:border-box; }
+.block-container { padding:0 !important; max-width:100% !important; }
+[data-testid="stMain"] { padding:0 !important; }
+.main, section.main { padding-top:0 !important; }
+
+/* ─ 2-stripe: sidebar white, rest soft gray ─────────────────────────────── */
+[data-testid="stAppViewContainer"] {
+    background: linear-gradient(to right,
+        #ffffff 0%, #ffffff 20%,
+        #edf0f5 20%, #edf0f5 100%
+    ) !important;
+    min-height:100vh !important;
 }
 
-# ── Sidebar ───────────────────────────────────────────────────────────────────
-with st.sidebar:
-    st.markdown("### 🧠 StudentAI")
-    st.caption("Student Distress Detection System")
-    st.divider()
+/* ─ Lock page to viewport — no page scroll ──────────────────────────────── */
+[data-testid="stAppViewContainer"],
+[data-testid="stMain"] {
+    height:100vh !important;
+    overflow:clip !important;
+}
+[data-testid="stBottom"] { display:none !important; }
 
-    model_choice = st.radio("**AI Model**", ["Logistic Regression", "Random Forest"])
-    mdl = "lr" if model_choice == "Logistic Regression" else "rf"
-    m   = METRICS[mdl]
+/* ─ Remove gap between header row and main layout row ──────────────────── */
+[data-testid="stMainBlockContainer"] > [data-testid="stVerticalBlock"] {
+    gap:0 !important;
+}
 
-    st.divider()
-    st.markdown("**Model Performance**")
-    c1, c2 = st.columns(2)
-    c1.metric("Accuracy",  m["acc"])
-    c2.metric("Precision", m["prec"])
-    c1, c2 = st.columns(2)
-    c1.metric("Recall",   m["rec"])
-    c2.metric("F1-Score", m["f1"])
+/* ─ Outer column row ───────────────────────────────────────────────────── */
+[data-role="main-layout"] {
+    align-items:stretch !important;
+    gap:0 !important;
+}
 
-    st.divider()
-    st.markdown("**Dataset**")
+/* ─ Each column: JS sets exact heights; columns scroll internally if needed */
+[data-role="sidebar"],
+[data-role="form"],
+[data-role="result"] {
+    align-self:stretch !important;
+    overflow-y:auto !important;
+    overflow-x:hidden !important;
+    scrollbar-width:thin;
+}
+
+/* ─ Sidebar sits above header row content ───────────────────────────────── */
+[data-role="sidebar"] {
+    position:relative !important;
+    z-index:2 !important;
+}
+
+/* ─ Sidebar ─────────────────────────────────────────────────────────────── */
+[data-role="sidebar"] {
+    background:#ffffff !important;
+    border-right:1px solid #e8ecf0 !important;
+    padding-left:12px !important;
+    padding-right:12px !important;
+}
+[data-role="sidebar"] p,
+[data-role="sidebar"] span,
+[data-role="sidebar"] label { color:#374151 !important; }
+[data-role="sidebar"] [data-testid="stWidgetLabel"] p {
+    color:#94a3b8 !important; font-size:10px !important;
+    font-weight:700 !important; letter-spacing:.1em !important;
+    text-transform:uppercase !important;
+}
+[data-role="sidebar"] .stButton button {
+    background:#f8fafc !important;
+    border:1px solid #e8ecf0 !important;
+    color:#64748b !important; border-radius:8px !important;
+    font-size:12.5px !important; font-weight:500 !important;
+    padding:9px 12px !important; transition:all .15s !important;
+    text-align:left !important; width:100% !important;
+}
+[data-role="sidebar"] .stButton button:hover:not(:disabled) {
+    background:#f1f5f9 !important;
+    color:#1e293b !important; border-color:#cbd5e1 !important;
+}
+[data-role="sidebar"] .stButton button[data-testid="baseButton-primary"] {
+    background:rgba(16,163,127,.08) !important;
+    border:1px solid rgba(16,163,127,.3) !important;
+    color:#10a37f !important; font-weight:700 !important;
+}
+[data-role="sidebar"] .stButton button:disabled {
+    background:#f8fafc !important;
+    border-color:#f1f5f9 !important;
+    color:#cbd5e1 !important; cursor:not-allowed !important; opacity:.6 !important;
+}
+
+/* ─ Rectangular segmented model selector ────────────────────────────────── */
+[data-role="sidebar"] [data-testid="stRadio"] > div > label { display:none !important; }
+/* Cascade full width from the column inner wrapper down to the radiogroup */
+[data-role="sidebar"] > div,
+[data-role="sidebar"] [data-testid="stVerticalBlock"],
+[data-role="sidebar"] .element-container,
+[data-role="sidebar"] [data-testid="stRadio"],
+[data-role="sidebar"] [data-testid="stRadio"] > div,
+[data-role="sidebar"] [data-testid="stRadio"] > div > div,
+[data-role="sidebar"] [data-testid="stRadio"] [role="radiogroup"] {
+    width:100% !important; box-sizing:border-box !important;
+}
+/* Track: rectangular trough */
+[data-role="sidebar"] [data-testid="stRadio"] [role="radiogroup"] {
+    flex-direction:row !important;
+    background:#f1f5f9 !important;
+    border:1px solid #e2e8f0 !important;
+    border-radius:10px !important;
+    padding:3px !important; gap:3px !important;
+}
+/* Each option */
+[data-role="sidebar"] [data-testid="stRadio"] [role="radiogroup"] > label {
+    flex:1 !important; margin:0 !important;
+    border-radius:8px !important;
+    padding:5px 4px !important;
+    cursor:pointer !important;
+    transition:background .15s !important;
+}
+/* Inner baseweb radio: centered, no circle */
+[data-role="sidebar"] [data-testid="stRadio"] [data-baseweb="radio"] {
+    display:flex !important; align-items:center !important;
+    justify-content:center !important; gap:0 !important;
+}
+[data-role="sidebar"] [data-testid="stRadio"] [data-baseweb="radio"] > div:first-child {
+    display:none !important;
+}
+/* Option text */
+[data-role="sidebar"] [data-testid="stRadio"] [data-baseweb="radio"] p {
+    font-size:12.5px !important; font-weight:500 !important;
+    color:#64748b !important; margin:0 !important; text-align:center !important;
+    white-space:nowrap !important;
+}
+/* Active option */
+[data-role="sidebar"] [data-testid="stRadio"] [role="radiogroup"] > label:has(input:checked) {
+    background:#fff !important;
+    box-shadow:0 1px 3px rgba(0,0,0,.1) !important;
+}
+[data-role="sidebar"] [data-testid="stRadio"] [role="radiogroup"] > label:has(input:checked) p {
+    color:#10a37f !important; font-weight:700 !important;
+}
+[data-role="sidebar"] [data-testid="stRadio"] input[type="radio"] { display:none !important; }
+
+/* ─ Form column: soft gray background, card floats inside ───────────────── */
+[data-role="form"] {
+    background:#edf0f5 !important;
+    border-right:none !important;
+    padding:40px 14px 20px !important;
+    align-items:flex-start !important;
+}
+/* Header row column — sits above the card in the gray zone */
+[data-role="form-header"] {
+    background:#edf0f5 !important;
+    padding:0 14px 0 !important;
+}
+[data-role="form-header-result"] {
+    background:#edf0f5 !important;
+    padding:0 !important;
+}
+/* The card */
+[data-role="form"] > div:first-child {
+    background:#ffffff !important;
+    border-radius:16px !important;
+    border:1.5px solid #e2e8f0 !important;
+    box-shadow:0 4px 24px rgba(15,23,42,.09), 0 1px 4px rgba(15,23,42,.04) !important;
+    overflow:clip !important;
+    padding:0 !important;
+    width:100% !important;
+}
+
+/* Remove ALL default Streamlit gaps inside the form */
+[data-role="form"] [data-testid="stVerticalBlock"] { gap:0 !important; }
+
+/* Each row of field columns */
+[data-role="form"] [data-testid="stHorizontalBlock"] {
+    gap:12px !important;
+    padding:0 20px !important;
+}
+/* Column inner div: top padding only (bottom spacing via inter-row spacers) */
+[data-role="form"] [data-testid="stColumn"] > div { padding:10px 0 0 !important; }
+
+/* ─ Form field label normalization ──────────────────────────────────────── */
+[data-role="form"] [data-testid="stHorizontalBlock"] [data-testid="stWidgetLabel"] {
+    margin:0 0 4px !important; padding:0 !important;
+}
+
+/* ─ Result column: same card treatment as form ──────────────────────────── */
+[data-role="result"] {
+    background:#edf0f5 !important;
+    padding:40px 14px 20px 0 !important;
+    align-items:flex-start !important;
+}
+[data-role="result"] > div:first-child {
+    background:#ffffff !important;
+    border-radius:16px !important;
+    border:1.5px solid #e2e8f0 !important;
+    box-shadow:0 4px 24px rgba(15,23,42,.09), 0 1px 4px rgba(15,23,42,.04) !important;
+    overflow:hidden !important;
+    padding:0 !important;
+    width:100% !important;
+    max-height:300px !important;
+    transition:max-height .9s cubic-bezier(.4,0,.2,1) !important;
+}
+/* Expand when prediction result is present — capped to viewport */
+[data-role="result"] > div:first-child:has(.result-card) {
+    max-height:calc(100vh - 100px) !important;
+    overflow-y:auto !important;
+}
+[data-role="result"] [data-testid="stVerticalBlock"] { gap:0 !important; }
+
+/* ─ Global widget label ─────────────────────────────────────────────────── */
+[data-testid="stWidgetLabel"] p {
+    font-size:12.5px !important; font-weight:600 !important;
+    color:#374151 !important; letter-spacing:0 !important;
+    text-transform:none !important; margin-bottom:4px !important;
+}
+[data-role="sidebar"] [data-testid="stWidgetLabel"] p {
+    font-size:10px !important; color:#475569 !important;
+    text-transform:uppercase !important; letter-spacing:.1em !important;
+}
+
+/* ─ Select box ──────────────────────────────────────────────────────────── */
+div[data-baseweb="select"] > div {
+    border:1.5px solid #e2e8f0 !important; border-radius:10px !important;
+    background:#fff !important; font-size:13px !important;
+    color:#1e293b !important; min-height:42px !important;
+    transition:border-color .15s, box-shadow .15s !important;
+}
+div[data-baseweb="select"] > div:focus-within {
+    border-color:#10a37f !important;
+    box-shadow:0 0 0 3px rgba(16,163,127,.1) !important;
+}
+
+/* ─ Number input — border lives on the container, buttons stay in flow ──── */
+/* Container becomes the visible "box" */
+[data-testid="stNumberInputContainer"] {
+    display:flex !important; align-items:stretch !important;
+    border:1.5px solid #e2e8f0 !important; border-radius:10px !important;
+    background:#fff !important; overflow:hidden !important;
+    transition:border-color .15s, box-shadow .15s !important;
+    min-height:42px !important;
+}
+[data-testid="stNumberInputContainer"]:focus-within {
+    border-color:#10a37f !important;
+    box-shadow:0 0 0 3px rgba(16,163,127,.1) !important;
+}
+/* Input: no border of its own — inherits the container's visual box */
+[data-testid="stNumberInput"] input {
+    flex:1 !important; min-width:0 !important;
+    border:none !important; outline:none !important; box-shadow:none !important;
+    background:transparent !important; font-size:13px !important;
+    color:#1e293b !important; padding:0 10px !important;
+}
+[data-testid="stNumberInput"] input:focus {
+    border:none !important; outline:none !important; box-shadow:none !important;
+}
+/* Button wrapper div sits to the right inside the container */
+[data-testid="stNumberInputContainer"] > div {
+    display:flex !important; align-items:stretch !important;
+    border-left:1.5px solid #e2e8f0 !important; flex-shrink:0 !important;
+}
+/* Each ± button */
+[data-testid="stNumberInputContainer"] button {
+    width:34px !important; border:none !important; border-radius:0 !important;
+    background:transparent !important; color:#64748b !important;
+    display:flex !important; align-items:center !important;
+    justify-content:center !important; cursor:pointer !important;
+    transition:background .12s !important;
+    border-left:1px solid #e2e8f0 !important;
+}
+[data-testid="stNumberInputContainer"] button:first-child {
+    border-left:none !important;
+}
+[data-testid="stNumberInputContainer"] button:hover {
+    background:#f1f5f9 !important;
+}
+
+
+/* ─ Primary button (Analyze) ────────────────────────────────────────────── */
+.stButton button[data-testid="baseButton-primary"] {
+    background:linear-gradient(135deg,#10a37f,#0d8f6e) !important;
+    border:none !important; color:#fff !important; font-weight:700 !important;
+    border-radius:10px !important; box-shadow:0 4px 14px rgba(16,163,127,.3) !important;
+    font-size:14px !important; letter-spacing:.01em !important;
+    transition:all .18s !important;
+}
+.stButton button[data-testid="baseButton-primary"]:hover {
+    box-shadow:0 6px 20px rgba(16,163,127,.45) !important;
+    transform:translateY(-1px) !important;
+}
+.stButton button[data-testid="baseButton-primary"]:active {
+    transform:translateY(0) !important;
+}
+
+/* ─ Secondary button (Reset) ────────────────────────────────────────────── */
+.stButton button[data-testid="baseButton-secondary"] {
+    background:#fff !important; border:1.5px solid #e2e8f0 !important;
+    color:#64748b !important; font-weight:600 !important;
+    border-radius:10px !important; font-size:13px !important;
+    transition:all .15s !important;
+}
+.stButton button[data-testid="baseButton-secondary"]:hover {
+    border-color:#cbd5e1 !important; color:#374151 !important;
+    background:#f8fafc !important;
+}
+
+/* ─ Scrollbar ───────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width:4px; }
+::-webkit-scrollbar-thumb { background:#d1d5db; border-radius:4px; }
+[data-role="sidebar"]::-webkit-scrollbar-thumb { background:#1e293b; }
+
+/* ─ Result panel animations ─────────────────────────────────────────────── */
+@keyframes resultCardIn {
+  from { opacity:0; transform:translateY(10px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+@keyframes statNumIn {
+  from { opacity:0; transform:scale(.85); }
+  to   { opacity:1; transform:scale(1); }
+}
+.result-card {
+  animation: resultCardIn .4s cubic-bezier(.4,0,.2,1) both;
+}
+.result-card:nth-child(2) { animation-delay:.08s; }
+.result-card:nth-child(3) { animation-delay:.16s; }
+
+/* ─ Analyze button loading state ────────────────────────────────────────── */
+@keyframes pulse {
+  0%,100% { opacity:1; }
+  50%      { opacity:.6; }
+}
+</style>""", unsafe_allow_html=True)
+
+# ── JS: tag 3-column layout for CSS targeting ─────────────────────────────────
+components.html("""<script>
+function tagLayout() {
+    try {
+        var doc = parent.document;
+        var hbs = doc.querySelectorAll('[data-testid="stHorizontalBlock"]');
+        var blocks = [];
+        for (var i = 0; i < hbs.length; i++) {
+            var cols = hbs[i].querySelectorAll(':scope > [data-testid="stColumn"]');
+            if (cols.length === 3) blocks.push({hb: hbs[i], cols: cols});
+        }
+        if (blocks.length === 0) return false;
+        // Last 3-col block is the main layout
+        var main = blocks[blocks.length - 1];
+        main.hb.setAttribute('data-role','main-layout');
+        main.cols[0].setAttribute('data-role','sidebar');
+        main.cols[1].setAttribute('data-role','form');
+        main.cols[2].setAttribute('data-role','result');
+        // Second-to-last 3-col block (if any) is the header row
+        if (blocks.length >= 2) {
+            var hdr = blocks[blocks.length - 2];
+            hdr.cols[1].setAttribute('data-role','form-header');
+            hdr.cols[2].setAttribute('data-role','form-header-result');
+        }
+        return true;
+    } catch(e) {}
+    return false;
+}
+
+function cleanSliders() {
+    try {
+        var doc = parent.document;
+        var form = doc.querySelector('[data-role="form"]');
+        if (!form) return;
+        // Hide native value bubble and tick marks on all form sliders
+        form.querySelectorAll('[data-testid="stSlider"]').forEach(function(s) {
+            s.querySelectorAll('p, [data-testid="stTickBarMin"], [data-testid="stTickBarMax"]')
+             .forEach(function(el){ el.style.cssText='display:none!important'; });
+            // Hide the floating value div above thumb (Streamlit renders it as a sibling div)
+            var track = s.querySelector('[role="slider"]');
+            if (track) {
+                var parent_div = track.parentElement;
+                if (parent_div) {
+                    parent_div.querySelectorAll('div:not([role="slider"])').forEach(function(d){
+                        if(d.textContent.trim().length < 5 && !isNaN(d.textContent.trim())) {
+                            d.style.cssText='display:none!important';
+                        }
+                    });
+                }
+            }
+        });
+    } catch(e) {}
+}
+
+function alignSidebar() {
+    try {
+        var doc = parent.document;
+        var headerCol = doc.querySelector('[data-role="form-header"]');
+        var sidebar = doc.querySelector('[data-role="sidebar"]');
+        if (!headerCol || !sidebar) return;
+        var row = headerCol.closest('[data-testid="stHorizontalBlock"]');
+        if (!row) return;
+        sidebar.style.marginTop = '-' + row.offsetHeight + 'px';
+    } catch(e) {}
+}
+
+function setLayoutHeight() {
+    try {
+        var doc = parent.document;
+        var hrowEl = doc.querySelector('[data-role="form-header"]');
+        if (!hrowEl) return;
+        var hrow = hrowEl.closest('[data-testid="stHorizontalBlock"]');
+        if (!hrow) return;
+        var headerH = hrow.offsetHeight;
+        var vh = Math.min(parent.innerHeight, doc.documentElement.clientHeight);
+        var mainH = Math.max(vh - headerH - 4, 380);
+        var el = doc.getElementById('sda-layout-h');
+        if (!el) { el = doc.createElement('style'); el.id = 'sda-layout-h'; doc.head.appendChild(el); }
+        el.textContent =
+            '[data-role="main-layout"]{height:'+mainH+'px!important;min-height:'+mainH+'px!important;}' +
+            '[data-role="sidebar"],[data-role="form"],[data-role="result"]{height:'+mainH+'px!important;min-height:'+mainH+'px!important;max-height:'+mainH+'px!important;}';
+    } catch(e) {}
+}
+
+(function retry(){ if(!tagLayout()) setTimeout(retry,80); else { alignSidebar(); setLayoutHeight(); } })();
+setInterval(function(){ tagLayout(); cleanSliders(); alignSidebar(); setLayoutHeight(); }, 500);
+</script>""", height=1)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FORM HEADER ROW (above the card, in the gray zone)
+# ══════════════════════════════════════════════════════════════════════════════
+_, _h_form, _ = st.columns([1.7, 5, 2.1], gap="small")
+with _h_form:
     st.markdown("""
-<div>
-<div class="sb-row"><span class="sb-key">Source</span><span class="sb-val">Kaggle</span></div>
-<div class="sb-row"><span class="sb-key">Total Records</span><span class="sb-val">27,895</span></div>
-<div class="sb-row"><span class="sb-key">Training Set</span><span class="sb-val">22,316 (80%)</span></div>
-<div class="sb-row"><span class="sb-key">Test Set</span><span class="sb-val">5,579 (20%)</span></div>
-<div class="sb-row"><span class="sb-key">Features</span><span class="sb-val">9</span></div>
-<div class="sb-row"><span class="sb-key">Classes</span><span class="sb-val">2</span></div>
+<div style="padding:0 0 10px;">
+  <h2 style="font-size:20px;font-weight:800;color:#0f172a;letter-spacing:-.4px;
+    line-height:1.2;margin:0;">Student Distress Assessment</h2>
+  <p style="font-size:14px;color:#94a3b8;margin:0;line-height:1.5;">
+    Enter the student's details below — the model will instantly predict their distress risk level.</p>
 </div>
 """, unsafe_allow_html=True)
 
-# ── Header ────────────────────────────────────────────────────────────────────
-st.markdown("## Student Distress Analyzer")
-st.caption(f"Predict psychological distress risk · Active model: **{m['name']}**")
-st.divider()
+# ══════════════════════════════════════════════════════════════════════════════
+# 3-COLUMN LAYOUT
+# ══════════════════════════════════════════════════════════════════════════════
+col_sb, col_form, col_result = st.columns([1.7, 5, 2.1], gap="small")
 
-# ── Layout ────────────────────────────────────────────────────────────────────
-col_l, col_r = st.columns([13, 9], gap="large")
+# ──────────────────────────────────────────────────────────────────────────────
+# SIDEBAR
+# ──────────────────────────────────────────────────────────────────────────────
+with col_sb:
+    st.markdown("""
+<div style="padding:24px 0 12px;">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+    <div style="width:36px;height:36px;background:linear-gradient(135deg,#10a37f,#059669);
+      border-radius:10px;display:flex;align-items:center;justify-content:center;
+      flex-shrink:0;box-shadow:0 4px 12px rgba(16,163,127,.25);">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.44-3.16Z"/>
+        <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.44-3.16Z"/>
+      </svg>
+    </div>
+    <div>
+      <div style="font-size:9.5px;font-weight:800;letter-spacing:.18em;color:#94a3b8;
+        text-transform:uppercase;margin-bottom:1px;">Student</div>
+      <div style="font-size:15.5px;font-weight:800;color:#0f172a;letter-spacing:-.2px;
+        line-height:1.15;white-space:nowrap;">Distress Analyzer</div>
+    </div>
+  </div>
+</div>
+<div style="height:1px;background:#e8ecf0;margin:0 0 16px;"></div>
+<div style="padding:0 0 8px;">
+  <div style="font-size:9px;font-weight:800;letter-spacing:.14em;color:#94a3b8;
+    text-transform:uppercase;margin-bottom:10px;">Prediction Model</div>
+</div>
+""", unsafe_allow_html=True)
 
-# ── Left: Input ───────────────────────────────────────────────────────────────
-with col_l:
-    st.markdown('<div class="panel-title"><span class="dot-live"></span>Student Profile Input</div>', unsafe_allow_html=True)
+    def _clear_result():
+        st.session_state.result = None
 
-    r1, r2 = st.columns(2)
-    gender = r1.selectbox("Gender", ["Male", "Female"])
-    age    = r2.number_input("Age", min_value=15, max_value=45, value=21, step=1)
+    st.radio(
+        "Prediction Model",
+        options=[m["id"] for m in MODEL_CONFIG if m["available"]],
+        format_func=lambda x: next(m["name"] for m in MODEL_CONFIG if m["id"] == x),
+        key="mdl",
+        label_visibility="collapsed",
+        on_change=_clear_result,
+    )
 
-    r3, r4 = st.columns(2)
-    academic_pressure = r3.slider("Academic Pressure", 1, 5, 3)
-    cgpa              = r4.number_input("CGPA (0.0–5.0)", min_value=0.0, max_value=5.0, value=3.50, step=0.01, format="%.2f")
+    acc_v  = f"{met.get('accuracy','–')}%"  if met else "–"
+    f1_v   = f"{met.get('f1','–')}%"        if met else "–"
+    prec_v = f"{met.get('precision','–')}%" if met else "–"
+    rec_v  = f"{met.get('recall','–')}%"    if met else "–"
 
-    r5, r6 = st.columns(2)
-    study_satisfaction = r5.slider("Study Satisfaction", 1, 5, 3)
-    sleep_duration     = r6.selectbox("Sleep Duration", ["Less than 5 hours", "5-6 hours", "7-8 hours", "More than 8 hours", "Others"])
+    st.markdown(f"""
+<div style="padding-top:16px;border-top:1px solid #e8ecf0;margin-top:14px;">
+  <div style="font-size:9px;font-weight:800;letter-spacing:.14em;color:#94a3b8;
+    text-transform:uppercase;margin-bottom:10px;">Model Performance</div>
+  <div style="display:flex;align-items:center;gap:7px;margin-bottom:14px;">
+    <div style="width:7px;height:7px;border-radius:50%;background:#10a37f;
+      box-shadow:0 0 0 3px rgba(16,163,127,.2);flex-shrink:0;"></div>
+    <span style="font-size:12px;font-weight:600;color:#64748b;">Active:</span>
+    <span style="font-size:12px;font-weight:700;color:#10a37f;">{active_cfg['name']}</span>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+    <div style="background:#f8fafc;border:1px solid #e8ecf0;
+      border-radius:8px;padding:8px 10px;">
+      <div style="font-size:9px;color:#94a3b8;margin-bottom:3px;letter-spacing:.04em;">Accuracy</div>
+      <div style="font-size:14px;font-weight:800;color:#0f172a;font-variant-numeric:tabular-nums;">{acc_v}</div>
+    </div>
+    <div style="background:#f8fafc;border:1px solid #e8ecf0;
+      border-radius:8px;padding:8px 10px;">
+      <div style="font-size:9px;color:#94a3b8;margin-bottom:3px;letter-spacing:.04em;">F1 Score</div>
+      <div style="font-size:14px;font-weight:800;color:#0f172a;font-variant-numeric:tabular-nums;">{f1_v}</div>
+    </div>
+    <div style="background:#f8fafc;border:1px solid #e8ecf0;
+      border-radius:8px;padding:8px 10px;">
+      <div style="font-size:9px;color:#94a3b8;margin-bottom:3px;letter-spacing:.04em;">Precision</div>
+      <div style="font-size:14px;font-weight:800;color:#0f172a;font-variant-numeric:tabular-nums;">{prec_v}</div>
+    </div>
+    <div style="background:#f8fafc;border:1px solid #e8ecf0;
+      border-radius:8px;padding:8px 10px;">
+      <div style="font-size:9px;color:#94a3b8;margin-bottom:3px;letter-spacing:.04em;">Recall</div>
+      <div style="font-size:14px;font-weight:800;color:#0f172a;font-variant-numeric:tabular-nums;">{rec_v}</div>
+    </div>
+  </div>
+</div>
+<div style="height:1px;background:#e8ecf0;margin:16px 0;"></div>
+<div style="margin:0 0 24px;">
+  <div style="font-size:9px;font-weight:800;letter-spacing:.14em;color:#94a3b8;
+    text-transform:uppercase;margin-bottom:10px;">Training Data</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+    <div style="background:#f8fafc;border:1px solid #e8ecf0;
+      border-radius:8px;padding:8px 10px;">
+      <div style="font-size:13px;font-weight:900;color:#0f172a;font-variant-numeric:tabular-nums;">27,895</div>
+      <div style="font-size:9px;color:#94a3b8;margin-top:2px;">Records</div>
+    </div>
+    <div style="background:#f8fafc;border:1px solid #e8ecf0;
+      border-radius:8px;padding:8px 10px;">
+      <div style="font-size:13px;font-weight:900;color:#0f172a;">9</div>
+      <div style="font-size:9px;color:#94a3b8;margin-top:2px;">Features</div>
+    </div>
+    <div style="background:#f8fafc;border:1px solid #e8ecf0;
+      border-radius:8px;padding:8px 10px;">
+      <div style="font-size:13px;font-weight:900;color:#10a37f;">80%</div>
+      <div style="font-size:9px;color:#94a3b8;margin-top:2px;">Train split</div>
+    </div>
+    <div style="background:#f8fafc;border:1px solid #e8ecf0;
+      border-radius:8px;padding:8px 10px;">
+      <div style="font-size:13px;font-weight:900;color:#10a37f;">20%</div>
+      <div style="font-size:9px;color:#94a3b8;margin-top:2px;">Test split</div>
+    </div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
-    r7, r8 = st.columns(2)
-    dietary_habits   = r7.selectbox("Dietary Habits", ["Healthy", "Moderate", "Unhealthy", "Others"])
-    work_study_hours = r8.number_input("Work/Study Hours per Day", min_value=0.0, max_value=16.0, value=6.0, step=0.5, format="%.1f")
+# ──────────────────────────────────────────────────────────────────────────────
+# FORM COLUMN
+# ──────────────────────────────────────────────────────────────────────────────
+with col_form:
 
-    financial_stress = st.slider("Financial Stress", 1, 5, 3)
+    def section_label(title, icon="", first=False):
+        top = "14px" if first else "20px"
+        st.markdown(
+            f'<div style="padding:{top} 24px 10px;background:#ffffff;">'
+            f'<span style="font-size:10px;font-weight:700;letter-spacing:.12em;'
+            f'color:#94a3b8;text-transform:uppercase;">{icon}{title}</span>'
+            f'</div>',
+            unsafe_allow_html=True
+        )
 
-    st.markdown("")
-    ba, bb = st.columns([1, 4])
-    reset_clicked   = ba.button("Reset",  use_container_width=True)
-    analyze_clicked = bb.button(f"Analyze · {'LR' if mdl == 'lr' else 'RF'} →", use_container_width=True, type="primary")
+    def field_pad(top=10, bottom=10):
+        """Vertical padding wrapper around a field row."""
+        st.markdown(
+            f'<div style="padding:{top}px 0 {bottom}px;"></div>',
+            unsafe_allow_html=True
+        )
 
-# ── Prediction ────────────────────────────────────────────────────────────────
+    def field_label(text):
+        """Plain label with the same fixed height as slider_label."""
+        st.markdown(
+            f'<div style="display:flex;align-items:center;height:28px;">'
+            f'<span style="font-size:12.5px;font-weight:600;color:#374151;">{text}</span>'
+            f'</div>',
+            unsafe_allow_html=True
+        )
+
+    def slider_label(text, val, min_v=1, max_v=5):
+        """Custom label row showing slider name + current value badge."""
+        pct = (val - min_v) / (max_v - min_v)
+        if pct < 0.4:
+            badge_bg, badge_color = "#f0fdf4", "#16a34a"
+        elif pct < 0.7:
+            badge_bg, badge_color = "#fffbeb", "#d97706"
+        else:
+            badge_bg, badge_color = "#fef2f2", "#dc2626"
+        st.markdown(
+            f'<div style="display:flex;align-items:center;justify-content:space-between;height:28px;">'
+            f'<span style="font-size:12.5px;font-weight:600;color:#374151;">{text}</span>'
+            f'<span style="background:{badge_bg};color:{badge_color};font-size:11px;'
+            f'font-weight:700;border-radius:6px;padding:2px 8px;">{val} / {max_v}</span>'
+            f'</div>',
+            unsafe_allow_html=True
+        )
+
+    def slider_label_wide(text, val, min_v=0, max_v=16, unit="hrs"):
+        pct = (val - min_v) / (max_v - min_v)
+        if pct < 0.4:
+            badge_bg, badge_color = "#f0fdf4", "#16a34a"
+        elif pct < 0.7:
+            badge_bg, badge_color = "#fffbeb", "#d97706"
+        else:
+            badge_bg, badge_color = "#fef2f2", "#dc2626"
+        st.markdown(
+            f'<div style="display:flex;align-items:center;justify-content:space-between;height:28px;">'
+            f'<span style="font-size:12.5px;font-weight:600;color:#374151;">{text}</span>'
+            f'<span style="background:{badge_bg};color:{badge_color};font-size:11px;'
+            f'font-weight:700;border-radius:6px;padding:2px 8px;">{val} {unit}</span>'
+            f'</div>',
+            unsafe_allow_html=True
+        )
+
+    # ── DEMOGRAPHICS ──────────────────────────────────────────────────────────
+    section_label("Demographics", first=True)
+    d1, d2 = st.columns(2, gap="small")
+    with d1:
+        gender = st.selectbox("Gender", ["Male", "Female"], key="gender")
+    with d2:
+        age = st.number_input("Age", 15, 45, 21, key="age")
+
+    # ── ACADEMIC PERFORMANCE ──────────────────────────────────────────────────
+    section_label("Academic Performance")
+    a1, a2 = st.columns(2, gap="small")
+    with a1:
+        academic_pressure = st.number_input("Academic Pressure (1–5)", min_value=1, max_value=5, step=1, key="ap")
+    with a2:
+        cgpa = st.number_input("CGPA (0.0 – 5.0)", 0.0, 5.0, 3.50, 0.01, format="%.2f", key="cgpa")
+
+    st.markdown('<div style="height:8px"></div>', unsafe_allow_html=True)
+
+    a3, a4 = st.columns(2, gap="small")
+    with a3:
+        study_satisfaction = st.number_input("Study Satisfaction (1–5)", min_value=1, max_value=5, step=1, key="ss")
+    with a4:
+        st.empty()
+
+    # ── LIFESTYLE ─────────────────────────────────────────────────────────────
+    section_label("Lifestyle")
+    l1, l2 = st.columns(2, gap="small")
+    with l1:
+        dietary_habits = st.selectbox("Dietary Habits",
+            ["Healthy", "Moderate", "Unhealthy", "Others"], key="diet")
+    with l2:
+        work_study_hours = st.number_input("Work / Study Hours (0–16)", min_value=0, max_value=16, step=1, key="wsh")
+
+    st.markdown('<div style="height:8px"></div>', unsafe_allow_html=True)
+
+    l3, l4 = st.columns(2, gap="small")
+    with l3:
+        financial_stress = st.number_input("Financial Stress (1–5)", min_value=1, max_value=5, step=1, key="fs")
+    with l4:
+        sleep_duration = st.selectbox("Sleep Duration", [
+            "Less than 5 hours", "5-6 hours", "7-8 hours",
+            "More than 8 hours", "Others"
+        ], key="sleep")
+
+    # ── ACTION BAR ────────────────────────────────────────────────────────────
+    st.markdown("""
+<div style="height:1px;background:#e2e8f0;margin:36px -24px 0;"></div>
+<div style="height:28px;"></div>
+""", unsafe_allow_html=True)
+
+    ab1, ab2 = st.columns([1, 3], gap="small")
+    with ab1:
+        reset_clicked = st.button("↺ Reset", key="reset_btn", use_container_width=True)
+    with ab2:
+        analyze = st.button(
+            f"Analyze with {active_cfg['name']}  →",
+            key="analyze_btn", use_container_width=True, type="primary"
+        )
+    st.markdown('<div style="height:2px;"></div>', unsafe_allow_html=True)
+
+# ──────────────────────────────────────────────────────────────────────────────
+# RESULT COLUMN
+# ──────────────────────────────────────────────────────────────────────────────
+with col_result:
+
+    r = st.session_state.result
+
+    # Header — always visible (compact state)
+    st.markdown("""
+<div style="padding:20px 20px 16px;background:#fff;border-radius:16px 16px 0 0;
+  border-bottom:1px solid #f1f5f9;">
+  <h3 style="font-size:18px;font-weight:800;color:#0f172a;letter-spacing:-.3px;
+    line-height:1;margin:0;">Prediction Result</h3>
+  <p style="font-size:14px;color:#9ca3af;margin:0;line-height:1;">AI-powered distress risk assessment</p>
+</div>
+""", unsafe_allow_html=True)
+
+    if r is None:
+        # Empty state — compact card with icon + hint
+        st.markdown("""
+<div style="padding:24px 20px 28px;text-align:center;">
+  <div style="width:50px;height:50px;background:#f1f5f9;border-radius:50%;
+    margin:0 auto 14px;display:flex;align-items:center;justify-content:center;">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+      stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 7V5a2 2 0 0 1 2-2h2"/>
+      <path d="M17 3h2a2 2 0 0 1 2 2v2"/>
+      <path d="M21 17v2a2 2 0 0 1-2 2h-2"/>
+      <path d="M7 21H5a2 2 0 0 1-2-2v-2"/>
+      <circle cx="12" cy="12" r="3"/>
+    </svg>
+  </div>
+  <div style="font-size:14.5px;font-weight:700;color:#1e293b;margin-bottom:5px;
+    letter-spacing:-.15px;">No prediction yet</div>
+  <div style="font-size:12.5px;color:#94a3b8;line-height:1.6;">
+    Fill in the student profile and click<br>
+    <span style="color:#10a37f;font-weight:600;">Analyze</span> to get a distress result
+  </div>
+</div>
+""", unsafe_allow_html=True)
+    else:
+        # ── Result display ────────────────────────────────────────────────────
+        prob_d   = r["prob_d"]
+        prob_nd  = r["prob_nd"]
+        mdl_name = r["model"]
+
+        if prob_d >= 70:
+            risk_level = "HIGH RISK"
+            risk_bg, risk_text = "#fff5f5", "#dc2626"
+            ring_col = "#ef4444"
+            badge_bg, badge_border = "#fef2f2", "#fecaca"
+        elif prob_d >= 45:
+            risk_level = "MEDIUM RISK"
+            risk_bg, risk_text = "#fffbeb", "#b45309"
+            ring_col = "#f59e0b"
+            badge_bg, badge_border = "#fefce8", "#fde68a"
+        else:
+            risk_level = "LOW RISK"
+            risk_bg, risk_text = "#f0fdf4", "#15803d"
+            ring_col = "#10a37f"
+            badge_bg, badge_border = "#f0fdf4", "#bbf7d0"
+
+        offset = round(251.2 * (1 - prob_d / 100), 1)
+
+        if prob_d >= 70:
+            advice = ("Significant distress indicators detected. "
+                      "Professional counselling, workload review, and campus support resources "
+                      "are strongly recommended.")
+        elif prob_d >= 45:
+            advice = ("Moderate distress indicators present. "
+                      "An early check-in with an academic advisor and monitoring of "
+                      "key stressors is recommended.")
+        else:
+            advice = ("Low distress indicators detected. "
+                      "Maintaining current healthy habits is advised. "
+                      "Continue to monitor each semester proactively.")
+
+        st.markdown(f"""
+<div style="padding:16px 16px 0;">
+
+  <!-- Risk ring card -->
+  <div class="result-card" style="background:{risk_bg};border:1.5px solid {badge_border};
+    border-radius:14px;padding:24px 20px 18px;text-align:center;margin-bottom:12px;">
+    <div style="position:relative;width:128px;height:128px;
+      display:inline-flex;align-items:center;justify-content:center;margin-bottom:12px;">
+      <svg width="128" height="128" viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(0,0,0,.07)" stroke-width="9"/>
+        <circle cx="50" cy="50" r="40" fill="none" stroke="{ring_col}" stroke-width="9"
+          stroke-dasharray="251.2" stroke-dashoffset="{offset}"
+          stroke-linecap="round" transform="rotate(-90 50 50)">
+          <animate attributeName="stroke-dashoffset"
+            from="251.2" to="{offset}"
+            dur="1.1s" calcMode="spline"
+            keyTimes="0;1" keySplines=".4,0,.2,1"
+            fill="freeze"/>
+        </circle>
+      </svg>
+      <div style="position:absolute;display:flex;flex-direction:column;
+        align-items:center;justify-content:center;">
+        <div style="font-size:28px;font-weight:900;color:{ring_col};
+          font-variant-numeric:tabular-nums;letter-spacing:-1px;line-height:1;
+          animation:statNumIn .6s .3s cubic-bezier(.4,0,.2,1) both;">
+          {prob_d:.0f}%</div>
+        <div style="font-size:8.5px;font-weight:700;color:{ring_col};
+          opacity:.7;letter-spacing:.08em;margin-top:1px;">DISTRESS</div>
+      </div>
+    </div>
+    <div style="display:inline-block;background:{badge_bg};border:1.5px solid {badge_border};
+      border-radius:20px;padding:4px 16px;margin-bottom:6px;">
+      <span style="font-size:11px;font-weight:800;color:{risk_text};letter-spacing:.06em;">
+        {risk_level}</span>
+    </div>
+    <div style="font-size:11px;color:#9ca3af;margin-top:2px;">via {mdl_name}</div>
+  </div>
+
+  <!-- Probability bars -->
+  <div class="result-card" style="background:#fff;border:1px solid #e8ecf0;border-radius:12px;
+    padding:16px 16px 14px;margin-bottom:12px;">
+    <div style="font-size:9.5px;font-weight:800;letter-spacing:.12em;color:#94a3b8;
+      text-transform:uppercase;margin-bottom:12px;">Probability Breakdown</div>
+    <div style="margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;
+        font-size:12.5px;margin-bottom:5px;">
+        <span style="font-weight:600;color:#ef4444;">Distressed</span>
+        <span style="font-weight:800;color:#0f172a;font-variant-numeric:tabular-nums;">
+          {prob_d:.1f}%</span>
+      </div>
+      <div style="background:#f1f5f9;border-radius:6px;height:8px;overflow:hidden;">
+        <div style="background:linear-gradient(to right,#ef4444,#f87171);
+          height:100%;border-radius:6px;
+          animation:barGrow .9s .1s cubic-bezier(.4,0,.2,1) both;
+          --bar-w:{prob_d:.1f}%;">
+        </div>
+      </div>
+    </div>
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:center;
+        font-size:12.5px;margin-bottom:5px;">
+        <span style="font-weight:600;color:#10a37f;">Not Distressed</span>
+        <span style="font-weight:800;color:#0f172a;font-variant-numeric:tabular-nums;">
+          {prob_nd:.1f}%</span>
+      </div>
+      <div style="background:#f1f5f9;border-radius:6px;height:8px;overflow:hidden;">
+        <div style="background:linear-gradient(to right,#10a37f,#34d399);
+          height:100%;border-radius:6px;
+          animation:barGrow .9s .2s cubic-bezier(.4,0,.2,1) both;
+          --bar-w:{prob_nd:.1f}%;">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Interpretation -->
+  <div class="result-card" style="background:#fff;border:1px solid #e8ecf0;border-radius:12px;
+    padding:16px 16px 14px;margin-bottom:16px;">
+    <div style="font-size:9.5px;font-weight:800;letter-spacing:.12em;color:#94a3b8;
+      text-transform:uppercase;margin-bottom:8px;">Recommendation</div>
+    <div style="font-size:13px;color:#374151;line-height:1.75;">{advice}</div>
+  </div>
+
+</div>
+<style>
+@keyframes barGrow {{
+  from {{ width:0; }}
+  to   {{ width:var(--bar-w); }}
+}}
+</style>
+""", unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PREDICTION LOGIC
+# ══════════════════════════════════════════════════════════════════════════════
 if reset_clicked:
+    st.session_state.result = None
     st.rerun()
 
-result = None
-if analyze_clicked:
-    row = {
-        "Gender":             gender,
-        "Age":                float(age),
-        "Academic Pressure":  int(academic_pressure),
-        "CGPA":               float(cgpa),
-        "Study Satisfaction": int(study_satisfaction),
-        "Sleep Duration":     sleep_duration,
-        "Dietary Habits":     dietary_habits,
-        "Work/Study Hours":   float(work_study_hours),
-        "Financial Stress":   int(financial_stress),
-    }
-    df = pd.DataFrame([row])
-    for col in CATEGORICAL:
-        df[col] = encoders[col].transform(df[col])
-    df = df[FEATURES]
-    df[NUMERICAL] = scaler.transform(df[NUMERICAL])
-
-    model  = lr_model if mdl == "lr" else rf_model
-    label  = int(model.predict(df)[0])
-    probas = model.predict_proba(df)[0]
-    conf   = float(probas[label]) * 100
-
-    result = {
-        "label":               label,
-        "label_text":          "Distressed" if label == 1 else "Not Distressed",
-        "confidence":          round(conf, 2),
-        "prob_distressed":     round(float(probas[1]) * 100, 2),
-        "prob_not_distressed": round(float(probas[0]) * 100, 2),
-        "model":               m["name"],
-        "inputs":              row,
-    }
-
-# ── Right: Result ─────────────────────────────────────────────────────────────
-with col_r:
-    st.markdown('<div class="panel-title">Prediction Result</div>', unsafe_allow_html=True)
-
-    if result is None:
-        st.markdown("""
-<div style="text-align:center;padding:48px 20px;background:#f9f9f9;border:1px dashed #e5e5e5;border-radius:12px;">
-    <div style="font-size:2.4rem;margin-bottom:10px;">🧠</div>
-    <div style="font-size:13px;color:#6b6b6b;line-height:1.6;">Fill in the student profile and click<br><strong>Analyze</strong> to see the prediction.</div>
-</div>""", unsafe_allow_html=True)
+if analyze:
+    model_obj = loaded_models.get(mdl)
+    if model_obj is None:
+        st.error(f"Model '{active_cfg['name']}' is not loaded. Please select another model.")
     else:
-        is_d       = result["label"] == 1
-        ring_color = "#ef4444" if is_d else "#10a37f"
-        badge_cls  = "badge-hi" if is_d else "badge-lo"
-        badge_txt  = "⚠ High Risk" if is_d else "✓ Low Risk"
-        conf       = result["confidence"]
-        pd_val     = result["prob_distressed"]
-        pnd_val    = result["prob_not_distressed"]
+        with st.spinner(f"Running {active_cfg['name']}…"):
+            row = {
+                "Gender":             gender,
+                "Age":                float(age),
+                "Academic Pressure":  int(academic_pressure),
+                "CGPA":               float(cgpa),
+                "Study Satisfaction": int(study_satisfaction),
+                "Sleep Duration":     sleep_duration,
+                "Dietary Habits":     dietary_habits,
+                "Work/Study Hours":   float(work_study_hours),
+                "Financial Stress":   int(financial_stress),
+            }
+            df = pd.DataFrame([row])
+            for col in CATEGORICAL:
+                df[col] = encoders[col].transform(df[col])
+            df = df[FEATURES]
+            df[NUMERICAL] = scaler.transform(df[NUMERICAL])
 
-        # SVG score ring
-        r_val  = 44
-        circ   = 2 * 3.14159265 * r_val
-        offset = circ * (1 - conf / 100)
-        cx = cy = 54
+            label  = int(model_obj.predict(df)[0])
+            probas = model_obj.predict_proba(df)[0]
+            prob_d = round(float(probas[1]) * 100, 2)
 
-        st.markdown(f"""
-<div class="score-wrap">
-    <svg width="108" height="108" viewBox="0 0 108 108">
-        <circle cx="{cx}" cy="{cy}" r="{r_val}" fill="none" stroke="#e5e5e5" stroke-width="8"/>
-        <circle cx="{cx}" cy="{cy}" r="{r_val}" fill="none" stroke="{ring_color}" stroke-width="8"
-                stroke-dasharray="{circ:.2f}" stroke-dashoffset="{offset:.2f}"
-                stroke-linecap="round" transform="rotate(-90 {cx} {cy})"/>
-        <text x="{cx}" y="{cy - 5}" text-anchor="middle" font-size="22" font-weight="800"
-              fill="{ring_color}" font-family="Inter,sans-serif">{conf:.0f}%</text>
-        <text x="{cx}" y="{cy + 13}" text-anchor="middle" font-size="10" fill="#acacbe"
-              font-family="Inter,sans-serif">Confidence</text>
-    </svg>
-    <div style="margin:6px 0;"><span class="{badge_cls}">{badge_txt}</span></div>
-    <div style="font-size:19px;font-weight:800;color:{'#ef4444' if is_d else '#10a37f'};margin:4px 0 2px;">{result['label_text']}</div>
-    <div style="font-size:12px;color:#acacbe;">via {result['model']}</div>
-</div>
-""", unsafe_allow_html=True)
-
-        # Probability bars
-        st.markdown(f"""
-<div style="margin:4px 0 12px;">
-    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#acacbe;margin-bottom:10px;">Probability Breakdown</div>
-    <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">
-        <span style="color:#ef4444;font-weight:500;">Distressed</span>
-        <span style="font-weight:700;color:#0d0d0d;">{pd_val:.1f}%</span>
-    </div>
-    <div class="bar-track"><div class="bar-fill-d" style="width:{pd_val:.1f}%;"></div></div>
-    <div style="display:flex;justify-content:space-between;font-size:12px;margin:8px 0 3px;">
-        <span style="color:#10a37f;font-weight:500;">Not Distressed</span>
-        <span style="font-weight:700;color:#0d0d0d;">{pnd_val:.1f}%</span>
-    </div>
-    <div class="bar-track"><div class="bar-fill-ok" style="width:{pnd_val:.1f}%;"></div></div>
-</div>
-""", unsafe_allow_html=True)
-
-        st.divider()
-
-        # Recommendations
-        rec_css   = "rec-pip-d" if is_d else "rec-pip-ok"
-        recs_list = ([
-            "Seek counseling or a mental health professional as soon as possible",
-            "Speak to your academic advisor about reducing workload this semester",
-            "Prioritise 7–8 hours of sleep — recovery depends on it",
-            "Explore campus financial aid, bursaries, or scholarship programs",
-            "Practice daily mindfulness, journaling, or breathing exercises",
-            "Connect with peer support groups or student counselling services",
-        ] if is_d else [
-            "Your current routines appear balanced — maintain them consistently",
-            "Continue healthy sleep habits for sustained academic performance",
-            "Check in with your academic advisor each semester proactively",
-            "Monitor stress levels and seek support early before issues escalate",
-            "Consider supporting classmates who may be struggling",
-        ])
-
-        title = "Intervention Recommendations" if is_d else "Wellness Tips"
-        rows_html = "".join(
-            f'<div class="rec-row"><div class="{rec_css}"></div><span>{r}</span></div>'
-            for r in recs_list
-        )
-        st.markdown(f"""
-<div>
-    <div style="font-size:12px;font-weight:700;color:#0d0d0d;margin-bottom:8px;">{title}</div>
-    {rows_html}
-</div>
-""", unsafe_allow_html=True)
+            st.session_state.result = {
+                "label":      label,
+                "label_text": "Distressed" if label == 1 else "Not Distressed",
+                "confidence": round(float(probas[label]) * 100, 2),
+                "prob_d":     prob_d,
+                "prob_nd":    round(float(probas[0]) * 100, 2),
+                "model":      active_cfg["name"],
+            }
+        st.rerun()

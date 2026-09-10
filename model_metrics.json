@@ -4,7 +4,7 @@
     "precision": 81.29,
     "recall": 85.49,
     "f1": 83.34,
-    "auc": 86.8
+    "auc": 86.80
   },
   "rf": {
     "accuracy": 79.01,
