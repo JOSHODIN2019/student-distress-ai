@@ -537,8 +537,37 @@ function setLayoutHeight() {
     } catch(e) {}
 }
 
-(function retry(){ if(!tagLayout()) setTimeout(retry,80); else { alignSidebar(); setLayoutHeight(); } })();
-setInterval(function(){ tagLayout(); cleanSliders(); alignSidebar(); setLayoutHeight(); }, 500);
+function styleModelBtns() {
+    try {
+        var doc = parent.document;
+        var marker = doc.getElementById('sda-active-mdl');
+        if (!marker) return;
+        var activeMdl = marker.textContent.trim();
+        var sidebar = doc.querySelector('[data-role="sidebar"]');
+        if (!sidebar) return;
+        var hb = sidebar.querySelector('[data-testid="stHorizontalBlock"]');
+        if (!hb) return;
+        var btns = hb.querySelectorAll('button');
+        btns.forEach(function(btn) {
+            var text = btn.textContent.trim().toLowerCase();
+            var isActive = (activeMdl === 'lr' && text.indexOf('logistic') !== -1) ||
+                           (activeMdl === 'rf' && text.indexOf('forest') !== -1);
+            if (isActive) {
+                btn.style.cssText = btn.style.cssText +
+                    ';background:linear-gradient(135deg,#10a37f,#0d8f6e)!important' +
+                    ';color:#fff!important;font-weight:700!important' +
+                    ';box-shadow:0 2px 6px rgba(16,163,127,.3)!important;border:none!important';
+            } else {
+                btn.style.cssText = btn.style.cssText +
+                    ';background:transparent!important;color:#64748b!important' +
+                    ';font-weight:500!important;box-shadow:none!important;border:none!important';
+            }
+        });
+    } catch(e) {}
+}
+
+(function retry(){ if(!tagLayout()) setTimeout(retry,80); else { alignSidebar(); setLayoutHeight(); styleModelBtns(); } })();
+setInterval(function(){ tagLayout(); cleanSliders(); alignSidebar(); setLayoutHeight(); styleModelBtns(); }, 500);
 </script>""", height=1)
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -607,6 +636,8 @@ with col_sb:
                      disabled=not any(m["id"]=="rf" and m["available"] for m in MODEL_CONFIG)):
             _switch_model("rf")
             st.rerun()
+    # Hidden marker so JS knows which model is active
+    st.markdown(f'<div id="sda-active-mdl" style="display:none">{mdl}</div>', unsafe_allow_html=True)
 
     acc_v  = f"{met.get('accuracy','–')}%"  if met else "–"
     f1_v   = f"{met.get('f1','–')}%"        if met else "–"
