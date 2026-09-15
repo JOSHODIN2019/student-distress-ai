@@ -175,17 +175,19 @@ html, body { margin:0; padding:0; overflow:hidden; height:100vh; }
     display:flex !important;
     align-items:center !important;
     width:100% !important;
-}
-[data-role="sidebar"] [data-testid="stHorizontalBlock"] .stButton button[data-testid="baseButton-primary"] {
-    background:linear-gradient(135deg,#10a37f,#0d8f6e) !important;
     border:none !important;
+    transition:background .25s ease, color .25s ease, box-shadow .25s ease !important;
+}
+[data-role="sidebar"] [data-testid="stHorizontalBlock"] .stButton button[data-testid="baseButton-primary"],
+[data-role="sidebar"] [data-testid="stHorizontalBlock"] .stButton button[data-testid="stBaseButton-primary"] {
+    background:linear-gradient(135deg,#10a37f,#0d8f6e) !important;
     color:#fff !important;
     font-weight:700 !important;
     box-shadow:0 2px 6px rgba(16,163,127,.3) !important;
 }
-[data-role="sidebar"] [data-testid="stHorizontalBlock"] .stButton button[data-testid="baseButton-secondary"] {
+[data-role="sidebar"] [data-testid="stHorizontalBlock"] .stButton button[data-testid="baseButton-secondary"],
+[data-role="sidebar"] [data-testid="stHorizontalBlock"] .stButton button[data-testid="stBaseButton-secondary"] {
     background:transparent !important;
-    border:none !important;
     color:#64748b !important;
     font-weight:500 !important;
     box-shadow:none !important;
@@ -537,6 +539,22 @@ function setLayoutHeight() {
     } catch(e) {}
 }
 
+function applyBtnStyle(btn, isActive) {
+    btn.style.setProperty('transition', 'background .25s ease, color .25s ease, box-shadow .25s ease', 'important');
+    btn.style.setProperty('border', 'none', 'important');
+    if (isActive) {
+        btn.style.setProperty('background', 'linear-gradient(135deg,#10a37f,#0d8f6e)', 'important');
+        btn.style.setProperty('color', '#fff', 'important');
+        btn.style.setProperty('font-weight', '700', 'important');
+        btn.style.setProperty('box-shadow', '0 2px 6px rgba(16,163,127,.3)', 'important');
+    } else {
+        btn.style.setProperty('background', 'transparent', 'important');
+        btn.style.setProperty('color', '#64748b', 'important');
+        btn.style.setProperty('font-weight', '500', 'important');
+        btn.style.setProperty('box-shadow', 'none', 'important');
+    }
+}
+
 function styleModelBtns() {
     try {
         var doc = parent.document;
@@ -552,22 +570,24 @@ function styleModelBtns() {
             var text = btn.textContent.trim().toLowerCase();
             var isActive = (activeMdl === 'lr' && text.indexOf('logistic') !== -1) ||
                            (activeMdl === 'rf' && text.indexOf('forest') !== -1);
-            if (isActive) {
-                btn.style.cssText = btn.style.cssText +
-                    ';background:linear-gradient(135deg,#10a37f,#0d8f6e)!important' +
-                    ';color:#fff!important;font-weight:700!important' +
-                    ';box-shadow:0 2px 6px rgba(16,163,127,.3)!important;border:none!important';
-            } else {
-                btn.style.cssText = btn.style.cssText +
-                    ';background:transparent!important;color:#64748b!important' +
-                    ';font-weight:500!important;box-shadow:none!important;border:none!important';
+            applyBtnStyle(btn, isActive);
+            // Attach click listener once for instant visual response before Streamlit rerenders
+            if (!btn._sdaWired) {
+                btn._sdaWired = true;
+                btn.addEventListener('click', function() {
+                    var clickedLR = btn.textContent.trim().toLowerCase().indexOf('logistic') !== -1;
+                    hb.querySelectorAll('button').forEach(function(b) {
+                        var bIsLR = b.textContent.trim().toLowerCase().indexOf('logistic') !== -1;
+                        applyBtnStyle(b, clickedLR ? bIsLR : !bIsLR);
+                    });
+                });
             }
         });
     } catch(e) {}
 }
 
 (function retry(){ if(!tagLayout()) setTimeout(retry,80); else { alignSidebar(); setLayoutHeight(); styleModelBtns(); } })();
-setInterval(function(){ tagLayout(); cleanSliders(); alignSidebar(); setLayoutHeight(); styleModelBtns(); }, 500);
+setInterval(function(){ tagLayout(); cleanSliders(); alignSidebar(); setLayoutHeight(); styleModelBtns(); }, 100);
 </script>""", height=1)
 
 # ══════════════════════════════════════════════════════════════════════════════
