@@ -159,7 +159,11 @@ html, body { margin:0; padding:0; overflow:hidden; height:100vh; }
 }
 
 /* ─ Rectangular segmented model selector ────────────────────────────────── */
-[data-role="sidebar"] [data-testid="stRadio"] > div > label { display:none !important; }
+/* Hide the widget title label only — target stWidgetLabel, not bare label */
+[data-role="sidebar"] [data-testid="stRadio"] [data-testid="stWidgetLabel"],
+[data-role="sidebar"] [data-testid="stRadio"] > div > label:not([data-baseweb]) {
+    display:none !important;
+}
 /* Cascade full width from the column inner wrapper down to the radiogroup */
 [data-role="sidebar"] > div,
 [data-role="sidebar"] [data-testid="stVerticalBlock"],
@@ -178,27 +182,30 @@ html, body { margin:0; padding:0; overflow:hidden; height:100vh; }
     border-radius:10px !important;
     padding:3px !important; gap:3px !important;
 }
-/* Each option */
+/* Each option label — always visible */
 [data-role="sidebar"] [data-testid="stRadio"] [role="radiogroup"] > label {
     flex:1 !important; margin:0 !important;
     border-radius:8px !important;
     padding:5px 4px !important;
     cursor:pointer !important;
+    display:flex !important;
     transition:background .15s !important;
 }
-/* Inner baseweb radio: centered, no circle */
+/* Inner baseweb radio: centered, hide the circle */
 [data-role="sidebar"] [data-testid="stRadio"] [data-baseweb="radio"] {
     display:flex !important; align-items:center !important;
-    justify-content:center !important; gap:0 !important;
+    justify-content:center !important; gap:0 !important; width:100% !important;
 }
 [data-role="sidebar"] [data-testid="stRadio"] [data-baseweb="radio"] > div:first-child {
     display:none !important;
 }
 /* Option text */
-[data-role="sidebar"] [data-testid="stRadio"] [data-baseweb="radio"] p {
+[data-role="sidebar"] [data-testid="stRadio"] [data-baseweb="radio"] p,
+[data-role="sidebar"] [data-testid="stRadio"] [role="radiogroup"] > label > div > p,
+[data-role="sidebar"] [data-testid="stRadio"] [role="radiogroup"] > label p {
     font-size:12.5px !important; font-weight:500 !important;
     color:#64748b !important; margin:0 !important; text-align:center !important;
-    white-space:nowrap !important;
+    white-space:nowrap !important; display:block !important;
 }
 /* Active option */
 [data-role="sidebar"] [data-testid="stRadio"] [role="radiogroup"] > label:has(input:checked) {
