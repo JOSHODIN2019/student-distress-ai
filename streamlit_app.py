@@ -158,31 +158,16 @@ html, body { margin:0; padding:0; overflow:hidden; height:100vh; }
     color:#cbd5e1 !important; cursor:not-allowed !important; opacity:.6 !important;
 }
 
-/* ─ Model toggle buttons in sidebar ─────────────────────────────────────── */
-[data-role="sidebar"] [data-testid="stHorizontalBlock"] {
-    gap:4px !important;
-    background:#f1f5f9 !important;
-    border:1px solid #e2e8f0 !important;
-    border-radius:10px !important;
-    padding:3px !important;
-}
-[data-role="sidebar"] [data-testid="stHorizontalBlock"] .stButton button {
-    text-align:center !important;
-    justify-content:center !important;
-    padding:6px 4px !important;
+/* ─ Model selector buttons in sidebar ───────────────────────────────────── */
+[data-role="sidebar"] .stButton button {
     font-size:12px !important;
     border-radius:8px !important;
-    display:flex !important;
-    align-items:center !important;
     width:100% !important;
-    border:none !important;
 }
-/* Force child p/span to inherit the button's JS-applied color */
-[data-role="sidebar"] [data-testid="stHorizontalBlock"] .stButton button p,
-[data-role="sidebar"] [data-testid="stHorizontalBlock"] .stButton button span,
-[data-role="sidebar"] [data-testid="stHorizontalBlock"] .stButton button div {
+[data-role="sidebar"] .stButton button p,
+[data-role="sidebar"] .stButton button span,
+[data-role="sidebar"] .stButton button div {
     color:inherit !important;
-    transition:color .25s ease !important;
 }
 
 /* ─ Form column: soft gray background, card floats inside ───────────────── */
@@ -536,19 +521,18 @@ function setLayoutHeight() {
 function applyBtnStyle(btn, isActive) {
     var color = isActive ? '#fff' : '#64748b';
     var fw    = isActive ? '700' : '500';
-    var bg    = isActive ? 'linear-gradient(135deg,#10a37f,#0d8f6e)' : 'transparent';
+    var bg    = isActive ? 'linear-gradient(135deg,#10a37f,#0d8f6e)' : '#f8fafc';
     var sh    = isActive ? '0 2px 6px rgba(16,163,127,.3)' : 'none';
-    // Incoming button fades in smoothly; outgoing snaps off instantly (avoids double-green overlap)
-    var tr    = isActive ? 'background .2s ease, color .2s ease, box-shadow .2s ease' : 'none';
-    btn.style.setProperty('transition', tr, 'important');
-    btn.style.setProperty('border', 'none', 'important');
+    var bdr   = isActive ? 'none' : '1px solid #e2e8f0';
+    btn.style.setProperty('transition', 'none', 'important');
+    btn.style.setProperty('border', bdr, 'important');
     btn.style.setProperty('background', bg, 'important');
     btn.style.setProperty('color', color, 'important');
     btn.style.setProperty('font-weight', fw, 'important');
     btn.style.setProperty('box-shadow', sh, 'important');
     btn.querySelectorAll('p,span,div').forEach(function(el) {
         el.style.setProperty('color', color, 'important');
-        el.style.setProperty('transition', isActive ? 'color .2s ease' : 'none', 'important');
+        el.style.setProperty('transition', 'none', 'important');
     });
 }
 
@@ -560,32 +544,28 @@ function styleModelBtns() {
         var activeMdl = marker.textContent.trim();
         var sidebar = doc.querySelector('[data-role="sidebar"]');
         if (!sidebar) return;
-        var hb = sidebar.querySelector('[data-testid="stHorizontalBlock"]');
-        if (!hb) return;
-        var btns = hb.querySelectorAll('button');
-        btns.forEach(function(btn) {
+        sidebar.querySelectorAll('button').forEach(function(btn) {
             var text = btn.textContent.trim().toLowerCase();
+            if (text.indexOf('logistic') === -1 && text.indexOf('forest') === -1) return;
             var isActive = (activeMdl === 'lr' && text.indexOf('logistic') !== -1) ||
                            (activeMdl === 'rf' && text.indexOf('forest') !== -1);
-            // Only mutate DOM when state differs — avoids constant repaints
             var alreadyActive = btn.style.getPropertyValue('background').indexOf('10a37f') !== -1;
             if (isActive !== alreadyActive) applyBtnStyle(btn, isActive);
-            // Wire click listener once
             if (!btn._sdaWired) {
                 btn._sdaWired = true;
                 (function(b) {
                     b.addEventListener('click', function() {
-                        // Apply to current elements immediately for instant visual response
                         var clickedLR = b.textContent.trim().toLowerCase().indexOf('logistic') !== -1;
-                        var container = b.closest('[data-testid="stHorizontalBlock"]');
-                        if (container) {
-                            container.querySelectorAll('button').forEach(function(x) {
+                        var sb = b.closest('[data-role="sidebar"]');
+                        if (sb) {
+                            sb.querySelectorAll('button').forEach(function(x) {
+                                var xt = x.textContent.trim().toLowerCase();
+                                if (xt.indexOf('logistic') === -1 && xt.indexOf('forest') === -1) return;
                                 applyBtnStyle(x, clickedLR
-                                    ? x.textContent.trim().toLowerCase().indexOf('logistic') !== -1
-                                    : x.textContent.trim().toLowerCase().indexOf('forest') !== -1);
+                                    ? xt.indexOf('logistic') !== -1
+                                    : xt.indexOf('forest') !== -1);
                             });
                         }
-                        // MutationObserver handles re-styling after Streamlit rerender
                     });
                 })(btn);
             }
@@ -650,19 +630,16 @@ with col_sb:
         st.session_state.mdl = new_mdl
         st.session_state.result = None
 
-    bt1, bt2 = st.columns(2, gap="small")
-    with bt1:
-        if st.button("Logistic Reg", key="btn_lr", use_container_width=True,
-                     type="primary" if mdl == "lr" else "secondary",
-                     disabled=not any(m["id"]=="lr" and m["available"] for m in MODEL_CONFIG)):
-            _switch_model("lr")
-            st.rerun()
-    with bt2:
-        if st.button("Random Forest", key="btn_rf", use_container_width=True,
-                     type="primary" if mdl == "rf" else "secondary",
-                     disabled=not any(m["id"]=="rf" and m["available"] for m in MODEL_CONFIG)):
-            _switch_model("rf")
-            st.rerun()
+    if st.button("Logistic Reg", key="btn_lr", use_container_width=True,
+                 type="primary" if mdl == "lr" else "secondary",
+                 disabled=not any(m["id"]=="lr" and m["available"] for m in MODEL_CONFIG)):
+        _switch_model("lr")
+        st.rerun()
+    if st.button("Random Forest", key="btn_rf", use_container_width=True,
+                 type="primary" if mdl == "rf" else "secondary",
+                 disabled=not any(m["id"]=="rf" and m["available"] for m in MODEL_CONFIG)):
+        _switch_model("rf")
+        st.rerun()
     # Hidden marker so JS knows which model is active
     st.markdown(f'<div id="sda-active-mdl" style="display:none">{mdl}</div>', unsafe_allow_html=True)
 
