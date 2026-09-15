@@ -176,7 +176,6 @@ html, body { margin:0; padding:0; overflow:hidden; height:100vh; }
     align-items:center !important;
     width:100% !important;
     border:none !important;
-    transition:background .25s ease, color .25s ease, box-shadow .25s ease !important;
 }
 /* Force child p/span to inherit the button's JS-applied color */
 [data-role="sidebar"] [data-testid="stHorizontalBlock"] .stButton button p,
@@ -539,16 +538,17 @@ function applyBtnStyle(btn, isActive) {
     var fw    = isActive ? '700' : '500';
     var bg    = isActive ? 'linear-gradient(135deg,#10a37f,#0d8f6e)' : 'transparent';
     var sh    = isActive ? '0 2px 6px rgba(16,163,127,.3)' : 'none';
-    btn.style.setProperty('transition', 'background .25s ease, color .25s ease, box-shadow .25s ease', 'important');
+    // Incoming button fades in smoothly; outgoing snaps off instantly (avoids double-green overlap)
+    var tr    = isActive ? 'background .2s ease, color .2s ease, box-shadow .2s ease' : 'none';
+    btn.style.setProperty('transition', tr, 'important');
     btn.style.setProperty('border', 'none', 'important');
     btn.style.setProperty('background', bg, 'important');
     btn.style.setProperty('color', color, 'important');
     btn.style.setProperty('font-weight', fw, 'important');
     btn.style.setProperty('box-shadow', sh, 'important');
-    // Also force child p/span/div text color — overrides sidebar p { color !important } rules
     btn.querySelectorAll('p,span,div').forEach(function(el) {
         el.style.setProperty('color', color, 'important');
-        el.style.setProperty('transition', 'color .25s ease', 'important');
+        el.style.setProperty('transition', isActive ? 'color .2s ease' : 'none', 'important');
     });
 }
 
@@ -575,7 +575,7 @@ function styleModelBtns() {
                 btn._sdaWired = true;
                 (function(b) {
                     b.addEventListener('click', function() {
-                        // Apply to current elements immediately
+                        // Apply to current elements immediately for instant visual response
                         var clickedLR = b.textContent.trim().toLowerCase().indexOf('logistic') !== -1;
                         var container = b.closest('[data-testid="stHorizontalBlock"]');
                         if (container) {
@@ -585,11 +585,7 @@ function styleModelBtns() {
                                     : x.textContent.trim().toLowerCase().indexOf('forest') !== -1);
                             });
                         }
-                        // Re-apply after Streamlit rerender completes (~200-400ms)
-                        // Start at 350ms so marker has updated before we read it
-                        [350, 600, 900].forEach(function(ms) {
-                            setTimeout(styleModelBtns, ms);
-                        });
+                        // MutationObserver handles re-styling after Streamlit rerender
                     });
                 })(btn);
             }
@@ -598,7 +594,7 @@ function styleModelBtns() {
 }
 
 (function retry(){ if(!tagLayout()) setTimeout(retry,80); else { alignSidebar(); setLayoutHeight(); styleModelBtns(); } })();
-setInterval(function(){ tagLayout(); cleanSliders(); alignSidebar(); setLayoutHeight(); styleModelBtns(); }, 500);
+setInterval(function(){ tagLayout(); cleanSliders(); alignSidebar(); setLayoutHeight(); styleModelBtns(); }, 200);
 </script>""", height=1)
 
 # ══════════════════════════════════════════════════════════════════════════════
