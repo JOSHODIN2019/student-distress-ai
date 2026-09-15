@@ -177,11 +177,11 @@ html, body { margin:0; padding:0; overflow:hidden; height:100vh; }
     width:100% !important;
 }
 [data-role="sidebar"] [data-testid="stHorizontalBlock"] .stButton button[data-testid="baseButton-primary"] {
-    background:#fff !important;
+    background:linear-gradient(135deg,#10a37f,#0d8f6e) !important;
     border:none !important;
-    color:#10a37f !important;
+    color:#fff !important;
     font-weight:700 !important;
-    box-shadow:0 1px 3px rgba(0,0,0,.1) !important;
+    box-shadow:0 2px 6px rgba(16,163,127,.3) !important;
 }
 [data-role="sidebar"] [data-testid="stHorizontalBlock"] .stButton button[data-testid="baseButton-secondary"] {
     background:transparent !important;
