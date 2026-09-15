@@ -178,19 +178,12 @@ html, body { margin:0; padding:0; overflow:hidden; height:100vh; }
     border:none !important;
     transition:background .25s ease, color .25s ease, box-shadow .25s ease !important;
 }
-[data-role="sidebar"] [data-testid="stHorizontalBlock"] .stButton button[data-testid="baseButton-primary"],
-[data-role="sidebar"] [data-testid="stHorizontalBlock"] .stButton button[data-testid="stBaseButton-primary"] {
-    background:linear-gradient(135deg,#10a37f,#0d8f6e) !important;
-    color:#fff !important;
-    font-weight:700 !important;
-    box-shadow:0 2px 6px rgba(16,163,127,.3) !important;
-}
-[data-role="sidebar"] [data-testid="stHorizontalBlock"] .stButton button[data-testid="baseButton-secondary"],
-[data-role="sidebar"] [data-testid="stHorizontalBlock"] .stButton button[data-testid="stBaseButton-secondary"] {
-    background:transparent !important;
-    color:#64748b !important;
-    font-weight:500 !important;
-    box-shadow:none !important;
+/* Force child p/span to inherit the button's JS-applied color */
+[data-role="sidebar"] [data-testid="stHorizontalBlock"] .stButton button p,
+[data-role="sidebar"] [data-testid="stHorizontalBlock"] .stButton button span,
+[data-role="sidebar"] [data-testid="stHorizontalBlock"] .stButton button div {
+    color:inherit !important;
+    transition:color .25s ease !important;
 }
 
 /* ─ Form column: soft gray background, card floats inside ───────────────── */
@@ -459,15 +452,17 @@ function tagLayout() {
         if (blocks.length === 0) return false;
         // Last 3-col block is the main layout
         var main = blocks[blocks.length - 1];
-        main.hb.setAttribute('data-role','main-layout');
-        main.cols[0].setAttribute('data-role','sidebar');
-        main.cols[1].setAttribute('data-role','form');
-        main.cols[2].setAttribute('data-role','result');
-        // Second-to-last 3-col block (if any) is the header row
+        function sa(el, val) {
+            if (el.getAttribute('data-role') !== val) el.setAttribute('data-role', val);
+        }
+        sa(main.hb, 'main-layout');
+        sa(main.cols[0], 'sidebar');
+        sa(main.cols[1], 'form');
+        sa(main.cols[2], 'result');
         if (blocks.length >= 2) {
             var hdr = blocks[blocks.length - 2];
-            hdr.cols[1].setAttribute('data-role','form-header');
-            hdr.cols[2].setAttribute('data-role','form-header-result');
+            sa(hdr.cols[1], 'form-header');
+            sa(hdr.cols[2], 'form-header-result');
         }
         return true;
     } catch(e) {}
@@ -540,19 +535,21 @@ function setLayoutHeight() {
 }
 
 function applyBtnStyle(btn, isActive) {
+    var color = isActive ? '#fff' : '#64748b';
+    var fw    = isActive ? '700' : '500';
+    var bg    = isActive ? 'linear-gradient(135deg,#10a37f,#0d8f6e)' : 'transparent';
+    var sh    = isActive ? '0 2px 6px rgba(16,163,127,.3)' : 'none';
     btn.style.setProperty('transition', 'background .25s ease, color .25s ease, box-shadow .25s ease', 'important');
     btn.style.setProperty('border', 'none', 'important');
-    if (isActive) {
-        btn.style.setProperty('background', 'linear-gradient(135deg,#10a37f,#0d8f6e)', 'important');
-        btn.style.setProperty('color', '#fff', 'important');
-        btn.style.setProperty('font-weight', '700', 'important');
-        btn.style.setProperty('box-shadow', '0 2px 6px rgba(16,163,127,.3)', 'important');
-    } else {
-        btn.style.setProperty('background', 'transparent', 'important');
-        btn.style.setProperty('color', '#64748b', 'important');
-        btn.style.setProperty('font-weight', '500', 'important');
-        btn.style.setProperty('box-shadow', 'none', 'important');
-    }
+    btn.style.setProperty('background', bg, 'important');
+    btn.style.setProperty('color', color, 'important');
+    btn.style.setProperty('font-weight', fw, 'important');
+    btn.style.setProperty('box-shadow', sh, 'important');
+    // Also force child p/span/div text color — overrides sidebar p { color !important } rules
+    btn.querySelectorAll('p,span,div').forEach(function(el) {
+        el.style.setProperty('color', color, 'important');
+        el.style.setProperty('transition', 'color .25s ease', 'important');
+    });
 }
 
 function styleModelBtns() {
@@ -570,24 +567,31 @@ function styleModelBtns() {
             var text = btn.textContent.trim().toLowerCase();
             var isActive = (activeMdl === 'lr' && text.indexOf('logistic') !== -1) ||
                            (activeMdl === 'rf' && text.indexOf('forest') !== -1);
-            applyBtnStyle(btn, isActive);
-            // Attach click listener once for instant visual response before Streamlit rerenders
+            // Only mutate DOM when state differs — avoids constant repaints
+            var alreadyActive = btn.style.getPropertyValue('background').indexOf('10a37f') !== -1;
+            if (isActive !== alreadyActive) applyBtnStyle(btn, isActive);
+            // Wire click listener once: instantly swap styles before Streamlit rerenders
             if (!btn._sdaWired) {
                 btn._sdaWired = true;
-                btn.addEventListener('click', function() {
-                    var clickedLR = btn.textContent.trim().toLowerCase().indexOf('logistic') !== -1;
-                    hb.querySelectorAll('button').forEach(function(b) {
-                        var bIsLR = b.textContent.trim().toLowerCase().indexOf('logistic') !== -1;
-                        applyBtnStyle(b, clickedLR ? bIsLR : !bIsLR);
+                (function(b) {
+                    b.addEventListener('click', function() {
+                        var clickedLR = b.textContent.trim().toLowerCase().indexOf('logistic') !== -1;
+                        var container = b.closest('[data-testid="stHorizontalBlock"]');
+                        if (!container) return;
+                        container.querySelectorAll('button').forEach(function(x) {
+                            applyBtnStyle(x, clickedLR
+                                ? x.textContent.trim().toLowerCase().indexOf('logistic') !== -1
+                                : x.textContent.trim().toLowerCase().indexOf('forest') !== -1);
+                        });
                     });
-                });
+                })(btn);
             }
         });
     } catch(e) {}
 }
 
 (function retry(){ if(!tagLayout()) setTimeout(retry,80); else { alignSidebar(); setLayoutHeight(); styleModelBtns(); } })();
-setInterval(function(){ tagLayout(); cleanSliders(); alignSidebar(); setLayoutHeight(); styleModelBtns(); }, 100);
+setInterval(function(){ tagLayout(); cleanSliders(); alignSidebar(); setLayoutHeight(); styleModelBtns(); }, 500);
 </script>""", height=1)
 
 # ══════════════════════════════════════════════════════════════════════════════
