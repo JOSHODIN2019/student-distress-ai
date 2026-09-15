@@ -158,64 +158,38 @@ html, body { margin:0; padding:0; overflow:hidden; height:100vh; }
     color:#cbd5e1 !important; cursor:not-allowed !important; opacity:.6 !important;
 }
 
-/* ─ Rectangular segmented model selector ────────────────────────────────── */
-/* Hide the widget title label only — target stWidgetLabel, not bare label */
-[data-role="sidebar"] [data-testid="stRadio"] [data-testid="stWidgetLabel"],
-[data-role="sidebar"] [data-testid="stRadio"] > div > label:not([data-baseweb]) {
-    display:none !important;
-}
-/* Cascade full width from the column inner wrapper down to the radiogroup */
-[data-role="sidebar"] > div,
-[data-role="sidebar"] [data-testid="stVerticalBlock"],
-[data-role="sidebar"] .element-container,
-[data-role="sidebar"] [data-testid="stRadio"],
-[data-role="sidebar"] [data-testid="stRadio"] > div,
-[data-role="sidebar"] [data-testid="stRadio"] > div > div,
-[data-role="sidebar"] [data-testid="stRadio"] [role="radiogroup"] {
-    width:100% !important; box-sizing:border-box !important;
-}
-/* Track: rectangular trough */
-[data-role="sidebar"] [data-testid="stRadio"] [role="radiogroup"] {
-    flex-direction:row !important;
+/* ─ Model toggle buttons in sidebar ─────────────────────────────────────── */
+[data-role="sidebar"] [data-testid="stHorizontalBlock"] {
+    gap:4px !important;
     background:#f1f5f9 !important;
     border:1px solid #e2e8f0 !important;
     border-radius:10px !important;
-    padding:3px !important; gap:3px !important;
+    padding:3px !important;
 }
-/* Each option label — always visible */
-[data-role="sidebar"] [data-testid="stRadio"] [role="radiogroup"] > label {
-    flex:1 !important; margin:0 !important;
+[data-role="sidebar"] [data-testid="stHorizontalBlock"] .stButton button {
+    text-align:center !important;
+    justify-content:center !important;
+    padding:6px 4px !important;
+    font-size:12px !important;
     border-radius:8px !important;
-    padding:5px 4px !important;
-    cursor:pointer !important;
     display:flex !important;
-    transition:background .15s !important;
+    align-items:center !important;
+    width:100% !important;
 }
-/* Inner baseweb radio: centered, hide the circle */
-[data-role="sidebar"] [data-testid="stRadio"] [data-baseweb="radio"] {
-    display:flex !important; align-items:center !important;
-    justify-content:center !important; gap:0 !important; width:100% !important;
-}
-[data-role="sidebar"] [data-testid="stRadio"] [data-baseweb="radio"] > div:first-child {
-    display:none !important;
-}
-/* Option text */
-[data-role="sidebar"] [data-testid="stRadio"] [data-baseweb="radio"] p,
-[data-role="sidebar"] [data-testid="stRadio"] [role="radiogroup"] > label > div > p,
-[data-role="sidebar"] [data-testid="stRadio"] [role="radiogroup"] > label p {
-    font-size:12.5px !important; font-weight:500 !important;
-    color:#64748b !important; margin:0 !important; text-align:center !important;
-    white-space:nowrap !important; display:block !important;
-}
-/* Active option */
-[data-role="sidebar"] [data-testid="stRadio"] [role="radiogroup"] > label:has(input:checked) {
+[data-role="sidebar"] [data-testid="stHorizontalBlock"] .stButton button[data-testid="baseButton-primary"] {
     background:#fff !important;
+    border:none !important;
+    color:#10a37f !important;
+    font-weight:700 !important;
     box-shadow:0 1px 3px rgba(0,0,0,.1) !important;
 }
-[data-role="sidebar"] [data-testid="stRadio"] [role="radiogroup"] > label:has(input:checked) p {
-    color:#10a37f !important; font-weight:700 !important;
+[data-role="sidebar"] [data-testid="stHorizontalBlock"] .stButton button[data-testid="baseButton-secondary"] {
+    background:transparent !important;
+    border:none !important;
+    color:#64748b !important;
+    font-weight:500 !important;
+    box-shadow:none !important;
 }
-[data-role="sidebar"] [data-testid="stRadio"] input[type="radio"] { display:none !important; }
 
 /* ─ Form column: soft gray background, card floats inside ───────────────── */
 [data-role="form"] {
@@ -616,17 +590,23 @@ with col_sb:
 </div>
 """, unsafe_allow_html=True)
 
-    def _clear_result():
+    def _switch_model(new_mdl):
+        st.session_state.mdl = new_mdl
         st.session_state.result = None
 
-    st.radio(
-        "Prediction Model",
-        options=[m["id"] for m in MODEL_CONFIG if m["available"]],
-        format_func=lambda x: next(m["name"] for m in MODEL_CONFIG if m["id"] == x),
-        key="mdl",
-        label_visibility="collapsed",
-        on_change=_clear_result,
-    )
+    bt1, bt2 = st.columns(2, gap="small")
+    with bt1:
+        if st.button("Logistic Reg", key="btn_lr", use_container_width=True,
+                     type="primary" if mdl == "lr" else "secondary",
+                     disabled=not any(m["id"]=="lr" and m["available"] for m in MODEL_CONFIG)):
+            _switch_model("lr")
+            st.rerun()
+    with bt2:
+        if st.button("Random Forest", key="btn_rf", use_container_width=True,
+                     type="primary" if mdl == "rf" else "secondary",
+                     disabled=not any(m["id"]=="rf" and m["available"] for m in MODEL_CONFIG)):
+            _switch_model("rf")
+            st.rerun()
 
     acc_v  = f"{met.get('accuracy','–')}%"  if met else "–"
     f1_v   = f"{met.get('f1','–')}%"        if met else "–"
