@@ -570,18 +570,25 @@ function styleModelBtns() {
             // Only mutate DOM when state differs — avoids constant repaints
             var alreadyActive = btn.style.getPropertyValue('background').indexOf('10a37f') !== -1;
             if (isActive !== alreadyActive) applyBtnStyle(btn, isActive);
-            // Wire click listener once: instantly swap styles before Streamlit rerenders
+            // Wire click listener once
             if (!btn._sdaWired) {
                 btn._sdaWired = true;
                 (function(b) {
                     b.addEventListener('click', function() {
+                        // Apply to current elements immediately
                         var clickedLR = b.textContent.trim().toLowerCase().indexOf('logistic') !== -1;
                         var container = b.closest('[data-testid="stHorizontalBlock"]');
-                        if (!container) return;
-                        container.querySelectorAll('button').forEach(function(x) {
-                            applyBtnStyle(x, clickedLR
-                                ? x.textContent.trim().toLowerCase().indexOf('logistic') !== -1
-                                : x.textContent.trim().toLowerCase().indexOf('forest') !== -1);
+                        if (container) {
+                            container.querySelectorAll('button').forEach(function(x) {
+                                applyBtnStyle(x, clickedLR
+                                    ? x.textContent.trim().toLowerCase().indexOf('logistic') !== -1
+                                    : x.textContent.trim().toLowerCase().indexOf('forest') !== -1);
+                            });
+                        }
+                        // Re-apply after Streamlit rerender completes (~200-400ms)
+                        // Start at 350ms so marker has updated before we read it
+                        [350, 600, 900].forEach(function(ms) {
+                            setTimeout(styleModelBtns, ms);
                         });
                     });
                 })(btn);
