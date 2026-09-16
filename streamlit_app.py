@@ -358,7 +358,7 @@ html, body { overflow:auto !important; height:auto !important; }
 [data-testid="stAppViewContainer"],
 [data-testid="stMain"] { height:auto !important; overflow:auto !important; }
 
-/* Solid gray bg — no white sidebar stripe */
+/* Solid gray bg */
 [data-testid="stAppViewContainer"] { background:#edf0f5 !important; }
 
 /* Header row: hide blank flanking columns, title fills width */
@@ -367,8 +367,10 @@ html, body { overflow:auto !important; height:auto !important; }
 [data-role="form-header-result"] { display:none !important; }
 [data-role="form-header"] {
     flex:1 1 100% !important; max-width:100% !important;
-    padding:16px 16px 10px !important;
+    padding:12px 16px 8px !important;
 }
+[data-role="form-header"] h2 { font-size:17px !important; }
+[data-role="form-header"] p  { font-size:13px !important; }
 
 /* Main layout: stack columns vertically */
 [data-role="main-layout"] {
@@ -376,8 +378,19 @@ html, body { overflow:auto !important; height:auto !important; }
     height:auto !important; min-height:auto !important;
 }
 
-/* Hide sidebar on mobile */
-[data-role="sidebar"] { display:none !important; }
+/* Sidebar → compact model-picker bar at top */
+[data-role="sidebar"] {
+    display:block !important;
+    width:100% !important;
+    height:auto !important; min-height:auto !important; max-height:none !important;
+    padding:10px 16px 12px !important;
+    background:#fff !important;
+    border-bottom:1px solid #e8ecf0 !important;
+    margin-top:0 !important;
+    overflow:visible !important;
+}
+/* Hide logo, performance stats, training data on mobile */
+#sda-sb-brand, #sda-sb-perf, #sda-sb-train { display:none !important; }
 
 /* Form and result: full width, natural height */
 [data-role="form"],
@@ -390,23 +403,30 @@ html, body { overflow:auto !important; height:auto !important; }
 [data-role="form"]   { padding:12px 12px 16px !important; }
 [data-role="result"] { padding:0 12px 16px !important; }
 
-/* Result card: lift max-height cap on mobile */
+/* Result card: lift max-height cap */
 [data-role="result"] > div:first-child,
 [data-role="result"] > div:first-child:has(.result-card) {
     max-height:none !important; overflow-y:visible !important;
 }
 
-/* Form field rows: tighter horizontal padding */
+/* Stack all form field pairs vertically on mobile */
 [data-role="form"] [data-testid="stHorizontalBlock"] {
-    padding:0 12px !important; gap:8px !important;
+    flex-direction:column !important;
+    padding:0 12px !important;
+    gap:0 !important;
 }
+[data-role="form"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+    width:100% !important; max-width:100% !important; min-width:0 !important;
 }
 
-/* Very small screens (≤ 480 px): stack 2-col field pairs vertically */
-@media (max-width:480px) {
-[data-role="form"] [data-testid="stHorizontalBlock"] { flex-wrap:wrap !important; }
-[data-role="form"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
-    flex:1 1 100% !important; min-width:0 !important; width:100% !important;
+/* Analyze/Reset button row stays horizontal */
+[data-role="form"] [data-testid="stHorizontalBlock"]:has([data-testid="baseButton-primary"]) {
+    flex-direction:row !important;
+    padding:0 24px !important;
+    gap:8px !important;
+}
+[data-role="form"] [data-testid="stHorizontalBlock"]:has([data-testid="baseButton-primary"]) > [data-testid="stColumn"] {
+    width:auto !important; max-width:none !important;
 }
 }
 </style>""", unsafe_allow_html=True)
@@ -535,6 +555,7 @@ col_sb, col_form, col_result = st.columns([1.7, 5, 2.1], gap="small")
 # ──────────────────────────────────────────────────────────────────────────────
 with col_sb:
     st.markdown("""
+<div id="sda-sb-brand">
 <div style="padding:24px 0 12px;">
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
     <div style="width:36px;height:36px;background:linear-gradient(135deg,#10a37f,#059669);
@@ -554,6 +575,7 @@ with col_sb:
   </div>
 </div>
 <div style="height:1px;background:#e8ecf0;margin:0 0 16px;"></div>
+</div>
 <div style="font-size:9px;font-weight:800;letter-spacing:.14em;color:#94a3b8;
   text-transform:uppercase;margin-bottom:10px;">Prediction Model</div>
 """, unsafe_allow_html=True)
@@ -578,7 +600,7 @@ with col_sb:
     rec_v  = f"{met.get('recall','–')}%"    if met else "–"
 
     st.markdown(f"""
-<div style="padding-top:16px;border-top:1px solid #e8ecf0;margin-top:14px;">
+<div id="sda-sb-perf" style="padding-top:16px;border-top:1px solid #e8ecf0;margin-top:14px;">
   <div style="font-size:9px;font-weight:800;letter-spacing:.14em;color:#94a3b8;
     text-transform:uppercase;margin-bottom:10px;">Model Performance</div>
   <div style="display:flex;align-items:center;gap:7px;margin-bottom:14px;">
@@ -610,8 +632,7 @@ with col_sb:
     </div>
   </div>
 </div>
-<div style="height:1px;background:#e8ecf0;margin:16px 0;"></div>
-<div style="margin:0 0 24px;">
+<div id="sda-sb-train" style="margin:0 0 24px;border-top:1px solid #e8ecf0;padding-top:16px;margin-top:0;">
   <div style="font-size:9px;font-weight:800;letter-spacing:.14em;color:#94a3b8;
     text-transform:uppercase;margin-bottom:10px;">Training Data</div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
