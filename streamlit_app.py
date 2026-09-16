@@ -554,7 +554,23 @@ with col_sb:
   </div>
 </div>
 <div style="height:1px;background:#e8ecf0;margin:0 0 16px;"></div>
+<div style="font-size:9px;font-weight:800;letter-spacing:.14em;color:#94a3b8;
+  text-transform:uppercase;margin-bottom:10px;">Prediction Model</div>
 """, unsafe_allow_html=True)
+
+    _label_to_id = {"Logistic Reg": "lr", "Random Forest": "rf"}
+    _id_to_label = {"lr": "Logistic Reg", "rf": "Random Forest"}
+    _selected = st.segmented_control(
+        "model_selector",
+        options=["Logistic Reg", "Random Forest"],
+        default=_id_to_label[mdl],
+        label_visibility="collapsed",
+        key="model_seg"
+    )
+    if _selected and _label_to_id[_selected] != mdl:
+        st.session_state.mdl = _label_to_id[_selected]
+        st.session_state.result = None
+        st.rerun()
 
     acc_v  = f"{met.get('accuracy','–')}%"  if met else "–"
     f1_v   = f"{met.get('f1','–')}%"        if met else "–"
